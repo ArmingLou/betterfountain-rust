@@ -1865,9 +1865,10 @@ pub fn generate(
             let mut title_section = crate::docx::adapter::docx::Section::new();
             title_section.properties = section_props.clone();
 
-            // 处理标题页内容
-            for (key, tokens) in &parsed.title_page {
-                println!(
+            // 处理标题页内容（按固定顺序：tl | tc | tr | cc | bl | br）
+            for key in ["tl", "tc", "tr", "cc", "bl", "br"] {
+                if let Some(tokens) = parsed.title_page.get(key) {
+                    println!(
                     "【generate】处理标题页元素: {} (包含 {} 个 token)",
                     key,
                     tokens.len()
@@ -1876,7 +1877,7 @@ pub fn generate(
                     let mut text = String::new();
 
                     // 根据不同的位置处理文本
-                    match key.as_str() {
+                    match key {
                         "tl" | "tc" | "tr" | "bl" | "cc" | "br" => {
                             // 按索引排序
                             let mut sorted_tokens = tokens.clone();
@@ -1900,7 +1901,7 @@ pub fn generate(
                                 // 在各个 case 中获取内宽，用于设置框架宽度
 
                                 // 设置对齐方式和框架属性
-                                match key.as_str() {
+                                match key {
                                     "tl" => {
                                         // 左上角
                                         // 使用默认的左对齐
@@ -2141,7 +2142,7 @@ pub fn generate(
                     }
                 }
             }
-
+        }
             section_title_page = Some(title_section);
         }
         println!("【generate】标题页处理完成");
