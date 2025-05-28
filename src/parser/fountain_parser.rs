@@ -14,7 +14,7 @@ use crate::models::{
 };
 
 /// 行结构体，用于存储处理后的行信息
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct Line {
     /// 行类型
     pub token_type: String,
@@ -76,7 +76,7 @@ pub struct TitleKeywordFormat {
     pub index: i32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct ParseOutput {
     pub tokens: Vec<ScriptToken>,
     pub properties: ScreenplayProperties,
@@ -1275,14 +1275,14 @@ impl FountainParser {
             if self.result.state == "normal" {
                 let mut action = false;
                 if is_block_begin_line {
-                    
+
                     // 检查是否是场景标题
                     if self.regex.get("scene_heading").unwrap().is_match(&self.text_valid) {
                         self.process_title_page_end(i);
-    
+
                         if self.result.properties.first_scene_line.is_none() || self.result.properties.first_scene_line == Some(usize::MAX) {
                             self.result.properties.first_scene_line = Some(i);
-    
+
                             // 从metadata里更新用户配置时间预估参数（与TypeScript版本保持一致）
                             if let Some(hidden_tokens) = self.result.title_page.get("hidden") {
                                 for token in hidden_tokens {
@@ -1312,39 +1312,39 @@ impl FountainParser {
                                 }
                             }
                         }
-    
+
                         self.force_not_dual = true;
                         // 去掉前面的点号
                         self.text_display = Regex::new(r"^[ \t]*\.").unwrap()
                             .replace(&self.text_display, "").to_string();
-    
+
                         // 如果配置要求每个场景新页面，且不是第一个场景，添加分页符
                         if cfg.each_scene_on_new_page && self.scene_number != 1 {
                             let page_break = self.create_token(Some(""), Some(0), Some(i), Some(text.len()), "page_break");
                             self.push_token(page_break);
                         }
-    
+
                         this_token.token_type = "scene_heading".to_string();
                         let mut nb = self.scene_number.to_string();
                         let mut scene_number_dup = false;
-    
+
                         // 处理场景编号
                         let mut text_for_token = Regex::new(r"^[ \t]*\.").unwrap()
                             .replace(&self.text_valid, "").to_string();
-    
+
                         if let Some(scene_num_match) = self.regex.get("scene_number").unwrap().captures(&self.text_valid) {
                             text_for_token = self.regex.get("scene_number").unwrap()
                                 .replace(&text_for_token, "").to_string();
                             self.text_display = self.regex.get("scene_number").unwrap()
                                 .replace(&self.text_display, "").to_string();
-    
+
                             // 处理场景编号
                             if let Some(group2) = scene_num_match.get(2) {
                                 if !group2.as_str().trim().is_empty() {
                                     nb = group2.as_str().trim().to_string();
                                 }
                             }
-    
+
                             if let Some(group1) = scene_num_match.get(1) {
                                 if !group1.as_str().trim().is_empty() {
                                     let tab = group1.as_str().trim().to_string();
@@ -1356,21 +1356,21 @@ impl FountainParser {
                                 }
                             }
                         }
-    
+
                         // 检查场景编号是否重复
                         if scence_numbers.contains(&nb) {
                             scene_number_dup = true;
                         } else {
                             scence_numbers.insert(nb.clone());
                         }
-    
+
                         // 设置场景编号
                         if scene_number_dup {
                             this_token.number = Some(format!("↑{}", nb)); // 用 ↑ 打印标记提示重复
                         } else {
                             this_token.number = Some(nb.clone());
                         }
-    
+
                         // 标准化场景标题格式
                         let mut idx = text_for_token.find('-');
                         if let Some(pos) = idx {
@@ -1378,33 +1378,33 @@ impl FountainParser {
                                 &text_for_token[..pos],
                                 &text_for_token[pos+1..]);
                         }
-    
+
                         text_for_token = text_for_token.to_uppercase()
                             .replace(|c: char| c.is_whitespace(), " ");
-    
+
                         idx = self.text_display.find('-');
                         if let Some(pos) = idx {
                             self.text_display = format!("{} - {}",
                                 &self.text_display[..pos],
                                 &self.text_display[pos+1..]);
                         }
-    
+
                         self.text_display = self.text_display.to_uppercase()
                             .replace(|c: char| c.is_whitespace(), " ");
-    
+
                         // 规范化空格：将多个连续空格替换为单个空格，并trim两端
                         self.text_display = Regex::new(r"\s+").unwrap()
                             .replace_all(&self.text_display, " ")
                             .trim()
                             .to_string();
-    
+
                         // 去掉场景标题前面的点号（与Flutter版本保持一致）
                         this_token.text = self.text_display.clone();
                         if this_token.text.trim_start().starts_with('.') {
                             this_token.text = this_token.text.trim_start().chars().skip(1).collect::<String>().trim_start().to_string();
                         }
                         this_token.text_no_notes = Some(text_for_token.clone());
-    
+
                         // 创建结构树节点
                         let mut cobj = StructToken {
                             text: format!("{} {}", this_token.number.clone().unwrap_or_default(), text_for_token.clone()),
@@ -1427,7 +1427,7 @@ impl FountainParser {
                             structs: Vec::new(),
                             duration: 0.0,
                         };
-    
+
                         // 设置结构树节点ID
                         if self.current_depth == 0 {
                             cobj.id = Some(format!("/{}", this_token.line));
@@ -1435,7 +1435,7 @@ impl FountainParser {
                         } else {
                             if let Some(level) = self.latest_section(self.current_depth) {
                                 cobj.id = Some(format!("{}/{}", level.id.as_ref().unwrap_or(&String::new()), this_token.line));
-    
+
                                 // 找到父节点并添加子节点
                                 for parent in &mut self.result.properties.structure {
                                     if parent.id == level.id {
@@ -1448,10 +1448,10 @@ impl FountainParser {
                                 self.result.properties.structure.push(cobj.clone());
                             }
                         }
-    
+
                         self.last_scen_structure_token_pre = self.last_scen_structure_token.clone();
                         self.last_scen_structure_token = Some(cobj.clone());
-    
+
                         if self.shot_cut > 0 {
                             if let Some(last_map) = self.shot_cut_strct_tokens.last_mut() {
                                 if let Some(structs) = last_map.get_mut("structs") {
@@ -1461,17 +1461,17 @@ impl FountainParser {
                                 }
                             }
                         }
-    
+
                         // 更新前一个场景的长度
                         self.update_previous_scene_length();
-    
+
                         if !self.result.properties.scenes.is_empty() {
                             let last_index = self.result.properties.scenes.len() - 1;
                             if let Some(scene) = self.result.properties.scenes.get_mut(last_index) {
                                 scene.insert("endPlaySec".to_string(), serde_json::to_value(self.play_time_sec).unwrap());
                             }
                         }
-    
+
                         // 添加新场景
                         let mut scene_map = HashMap::new();
                         scene_map.insert("scene".to_string(), serde_json::to_value(nb.clone()).unwrap());
@@ -1482,12 +1482,12 @@ impl FountainParser {
                         scene_map.insert("number".to_string(), serde_json::to_value(nb.clone()).unwrap());
                         scene_map.insert("startPlaySec".to_string(), serde_json::to_value(self.play_time_sec).unwrap());
                         scene_map.insert("endPlaySec".to_string(), serde_json::to_value(self.play_time_sec).unwrap());
-    
+
                         // println!("DEBUG: 添加场景 {} (行号: {})", nb, this_token.line);
                     self.result.properties.scenes.push(scene_map);
                         self.result.properties.scene_lines.push(this_token.line);
                         self.result.properties.scene_names.push(self.text_valid.clone());
-    
+
                         // 处理场景位置信息
                         if let Some(location) = self.parse_location_information(&self.text_valid) {
                             let location_slug = self.slugify(&location.name);
@@ -1496,13 +1496,13 @@ impl FountainParser {
                                 .map(|it| it.trim().to_string())
                                 .filter(|it| !it.is_empty())
                                 .collect();
-    
+
                             for sl in lslugs {
                                 let mut loc = location.clone();
                                 loc.scene_number = nb.clone();
                                 loc.line = this_token.line;
                                 loc.start_play_sec = self.play_time_sec;
-    
+
                                 if let Some(locations) = self.result.properties.locations.get_mut(&sl) {
                                     if !locations.iter().any(|it| it.line == this_token.line) {
                                         locations.push(loc);
@@ -1512,12 +1512,12 @@ impl FountainParser {
                                 }
                             }
                         }
-    
+
                         // 更新场景编号
                         if !scene_number_dup {
                             self.scene_number += 1;
                         }
-    
+
                         self.push_token(this_token);
                         continue;
                     } else if self.regex.get("centered").unwrap().is_match(&self.text_valid) {
@@ -1527,37 +1527,37 @@ impl FountainParser {
                         // 处理转场
                         // 处理镜头交切标志
                         let match_display = self.regex.get("transition").unwrap().captures(&self.text_valid);
-    
+
                         if let Some(captures) = match_display {
                             if captures.len() > 2 && captures.get(2).is_some() {
                                 let tx = captures.get(2).unwrap().as_str().trim();
-    
+
                                 if tx.starts_with("{+") && tx.ends_with("+} ↓") {
                                     self.shot_cut = 1;
                                     let mut shot_cut_map = HashMap::new();
                                     shot_cut_map.insert("duration".to_string(), serde_json::to_value(0.0).unwrap());
-    
+
                                     let mut structs = Vec::new();
                                     if let Some(last_scen) = &self.last_scen_structure_token {
                                         structs.push(serde_json::to_value(last_scen).unwrap());
                                     }
-    
+
                                     shot_cut_map.insert("structs".to_string(), serde_json::to_value(structs).unwrap());
                                     self.shot_cut_strct_tokens.push(shot_cut_map);
                                 } else if tx.starts_with("{#") && tx.ends_with("#} ↓") {
                                     self.shot_cut = 2;
                                     let mut shot_cut_map = HashMap::new();
                                     shot_cut_map.insert("duration".to_string(), serde_json::to_value(0.0).unwrap());
-    
+
                                     let mut structs = Vec::new();
                                     if let Some(last_scen_pre) = &self.last_scen_structure_token_pre {
                                         structs.push(serde_json::to_value(last_scen_pre).unwrap());
                                     }
-    
+
                                     if let Some(last_scen) = &self.last_scen_structure_token {
                                         structs.push(serde_json::to_value(last_scen).unwrap());
                                     }
-    
+
                                     shot_cut_map.insert("structs".to_string(), serde_json::to_value(structs).unwrap());
                                     self.shot_cut_strct_tokens.push(shot_cut_map);
                                 } else if tx.starts_with("{=") && tx.ends_with("=} ↓") {
@@ -1571,14 +1571,14 @@ impl FountainParser {
                                 }
                             }
                         }
-    
+
                         self.process_title_page_end(i);
                         this_token.text = Regex::new(r"^\s*>\s*").unwrap()
                             .replace(&self.text_display, "").to_string();
-    
+
                         process_token_text_style_char(&mut this_token);
                         this_token.token_type = "transition".to_string();
-    
+
                         self.push_token(this_token);
                         continue;
                     } else if self.regex.get("character").unwrap().is_match(&self.text_valid) {
@@ -1588,24 +1588,24 @@ impl FountainParser {
                         this_token.token_type = "character".to_string();
                         this_token.take_number = Some(self.take_count as i32);
                         self.take_count += 1;
-    
+
                         // 处理角色名
                         let mut text_valid = self.trim_character_force_symbol(&self.text_valid);
-    
+
                         // 检查是否是双对话
                         if text_valid.ends_with("^") {
                             if cfg.use_dual_dialogue && !self.force_not_dual {
                                 self.result.state = "dual_dialogue".to_string();
-    
+
                                 // 更新上一个对话为dual:left
                                 let dialogue_tokens = ["dialogue", "character", "parenthetical"];
                                 let mut mod_last = false;
                                 let mut last_character_index = last_character_index;
-    
+
                                 while last_character_index < self.result.tokens.len() &&
                                       dialogue_tokens.contains(&self.result.tokens[last_character_index].token_type.as_str()) {
                                     let old_last_dual = self.result.tokens[last_character_index].dual.clone();
-    
+
                                     if old_last_dual.is_none() || old_last_dual.as_ref().unwrap().is_empty() {
                                         mod_last = true;
                                         self.result.tokens[last_character_index].dual = Some("left".to_string());
@@ -1615,15 +1615,15 @@ impl FountainParser {
                                     } else {
                                         self.result.dual_str = Some("left".to_string());
                                     }
-    
+
                                     last_character_index += 1;
                                 }
-    
+
                                 if mod_last {
                                     // 更新上一个dialogue_begin为dual_dialogue_begin，并移除最后的dialogue_end
                                     let mut found_match = false;
                                     let mut temp_index = self.result.tokens.len();
-    
+
                                     while !found_match && temp_index > 0 {
                                         temp_index -= 1;
                                         match self.result.tokens[temp_index].token_type.as_str() {
@@ -1640,14 +1640,14 @@ impl FountainParser {
                                         }
                                     }
                                 }
-    
+
                                 if self.result.dual_str.as_ref().unwrap() == "left" {
                                     self.push_token(self.create_token(None, None, None, None, "dual_dialogue_begin"));
                                 } else {
                                     // 删除之前left的dual_dialogue_end
                                     let mut found_match = false;
                                     let mut temp_index = self.result.tokens.len();
-    
+
                                     while !found_match && temp_index > 0 {
                                         temp_index -= 1;
                                         match self.result.tokens[temp_index].token_type.as_str() {
@@ -1660,15 +1660,15 @@ impl FountainParser {
                                         }
                                     }
                                 }
-    
+
                                 this_token.dual = self.result.dual_str.clone();
                             } else {
                                 self.push_token(self.create_token(None, None, None, None, "dialogue_begin"));
                             }
-    
+
                             // 移除角色名后的^符号
                             text_valid = Regex::new(r"\^\s*$").unwrap().replace(&text_valid, "").to_string();
-    
+
                             // 替代前瞻性判断的实现：分别处理三种情况
                             // 1. ^空白字符后跟注释开始符号 இ
                             if let Some(captures) = Regex::new(r"(\^\s*)(இ.*$)").unwrap().captures(&self.text_display) {
@@ -1688,15 +1688,15 @@ impl FountainParser {
                         } else {
                             self.push_token(self.create_token(None, None, None, None, "dialogue_begin"));
                         }
-    
+
                         self.force_not_dual = false;
                         let character = self.trim_character_extension(&text_valid).trim().to_string();
                         _previous_character = Some(character.clone());
                         this_token.character = Some(character.clone());
-    
+
                         // 更新角色信息
                         let scene_idx = self.result.properties.scenes.len().saturating_sub(1);
-    
+
                         if let Some(values) = self.result.properties.characters.get_mut(&character) {
                             if !values.contains(&scene_idx) {
                                 values.push(scene_idx);
@@ -1704,39 +1704,39 @@ impl FountainParser {
                         } else {
                             self.result.properties.characters.insert(character.clone(), vec![scene_idx]);
                         }
-    
+
                         if self.result.properties.character_lines.is_none() {
                             self.result.properties.character_lines = Some(HashMap::new());
                         }
-    
+
                         if let Some(char_lines) = &mut self.result.properties.character_lines {
                             char_lines.insert(this_token.line, character.clone());
                         }
-    
+
                         if self.result.properties.scenes.is_empty() {
                             if self.result.properties.character_first_line.is_none() ||
                                !self.result.properties.character_first_line.as_ref().unwrap().contains_key(&character) {
-    
+
                                 if self.result.properties.character_first_line.is_none() {
                                     self.result.properties.character_first_line = Some(HashMap::new());
                                 }
-    
+
                                 if let Some(char_first_line) = &mut self.result.properties.character_first_line {
                                     char_first_line.insert(character.clone(), this_token.line);
                                 }
-    
+
                                 if self.result.properties.character_describe.is_none() {
                                     self.result.properties.character_describe = Some(HashMap::new());
                                 }
-    
+
                                 if let Some(char_describe) = &mut self.result.properties.character_describe {
                                     char_describe.insert(character.clone(), text.to_string());
                                 }
                             }
                         }
-    
+
                         last_character_index = self.result.tokens.len();
-    
+
                         // 对话角色加入结构树
                         if let Some(last_scen_structure_token) = &mut self.last_scen_structure_token {
                             if cfg.dialogue_foldable {
@@ -1761,41 +1761,41 @@ impl FountainParser {
                                     structs: Vec::new(),
                                     duration: 0.0,
                                 };
-    
+
                                 last_scen_structure_token.children.push(cobj.clone());
                                 self.last_chartor_structure_token = Some(cobj);
                             }
                         }
-    
+
                         // 处理角色名格式
                         self.text_display = Regex::new(r"^(.*?↻)?[ \t]*@").unwrap()
                             .replace(&self.text_display, "").trim().to_string();
                         this_token.text = self.text_display.clone();
-    
+
                         if cfg.print_dialogue_numbers {
                             self.add_dialogue_number_decoration(&mut this_token);
                         }
-    
+
                         self.push_token(this_token);
                         continue;
                     } else if BLOCK_REGEX.get("action_force").unwrap().is_match(&self.text_valid) {
                         // 处理强制动作
                         self.process_title_page_end(i);
                         this_token.token_type = "action".to_string();
-    
+
                         let mt = Regex::new(r"^((?:.*?↻)?\s*)(\!)(.*)")
                             .unwrap()
                             .captures(&self.text_display);
-    
+
                         if let Some(captures) = mt {
                             let group1 = captures.get(1).map_or("", |m| m.as_str());
                             let group3 = captures.get(3).map_or("", |m| m.as_str());
-    
+
                             this_token.text = format!("{}{}", group1, group3);
                             process_token_text_style_char(&mut this_token);
                             this_token = self.process_action_block(this_token);
                         }
-    
+
                         self.push_token(this_token);
                         continue;
                     }  else {
@@ -1804,46 +1804,46 @@ impl FountainParser {
                 } else {
                     action = true;
                 }
-                
+
                 if action {
                     if self.regex.get("centered").unwrap().is_match(&self.text_valid) {
                         // 处理居中文本
                         self.process_title_page_end(i);
                         this_token.token_type = "centered".to_string();
-    
+
                         let mt = Regex::new(r"((?:^.*?↻)|^)[ \t]*>\s*(.+)\s*?<\s*((?:இ.*$)|(?:↺.*$)|$)").unwrap()
                             .captures(&self.text_display);
-    
+
                         if let Some(captures) = mt {
                             let group1 = captures.get(1).map_or("", |m| m.as_str()).trim();
                             let group2 = captures.get(2).map_or("", |m| m.as_str()).trim();
                             let group3 = captures.get(3).map_or("", |m| m.as_str()).trim();
-    
+
                             this_token.text = format!("{}{}{}", group1, group2, group3);
                             process_token_text_style_char(&mut this_token);
                         }
-    
+
                         self.push_token(this_token);
                         continue;
                     }else if self.regex.get("section").unwrap().is_match(&self.text_valid) {
                         // 处理章节标题
                         self.process_title_page_end(i);
                         this_token.token_type = "section".to_string();
-    
+
                         let mt = Regex::new(r"^((?:.*?↻)?\s*)(#+)(?:\s*)(.*)").unwrap()
                             .captures(&self.text_display);
-    
+
                         if let Some(captures) = mt {
                             let group1 = captures.get(1).map_or("", |m| m.as_str());
                             let group2 = captures.get(2).map_or("", |m| m.as_str());
                             let group3 = captures.get(3).map_or("", |m| m.as_str());
-    
+
                             this_token.level = Some(group2.len() as i32);
                             this_token.text = format!("{}{}", group1, group3);
                             process_token_text_style_char(&mut this_token);
-                            
+
                             println!("【parse】section: {}, level: {:?}", this_token.text, this_token.level);
-    
+
                             // 创建结构树节点
                             let mut cobj = StructToken {
                                 text: group3.to_string(),
@@ -1866,16 +1866,16 @@ impl FountainParser {
                                 structs: Vec::new(),
                                 duration: 0.0,
                             };
-    
+
                             self.current_depth = group2.len();
-    
+
                             if self.current_depth == 1 {
                                 cobj.id = Some(format!("/{}", this_token.line));
                                 self.result.properties.structure.push(cobj);
                             } else {
                                 if let Some(level) = self.latest_section(self.current_depth - 1) {
                                     cobj.id = Some(format!("{}/{}", level.id.as_ref().unwrap_or(&String::new()), this_token.line));
-    
+
                                     // 找到父节点并添加子节点
                                     for parent in &mut self.result.properties.structure {
                                         if parent.id == level.id {
@@ -1889,7 +1889,7 @@ impl FountainParser {
                                 }
                             }
                         }
-    
+
                         self.push_token(this_token);
                         continue;
                     } else if self.regex.get("page_break").unwrap().is_match(&self.text_valid) {
@@ -1897,30 +1897,30 @@ impl FountainParser {
                         self.process_title_page_end(i);
                         this_token.token_type = "page_break".to_string();
                         this_token.text = "".to_string();
-    
+
                         self.push_token(this_token);
                         continue;
                     } else if self.regex.get("synopsis").unwrap().is_match(&self.text_valid) {
                         // 处理概要
                         self.process_title_page_end(i);
                         this_token.token_type = "synopsis".to_string();
-    
+
                         let mt = Regex::new(r"^((?:.*?↻)?\s*)(?:\=)(.*)").unwrap()
                             .captures(&self.text_display);
-    
+
                         if let Some(captures) = mt {
                             let group1 = captures.get(1).map_or("", |m| m.as_str());
                             let group2 = captures.get(2).map_or("", |m| m.as_str());
-    
+
                             this_token.text = format!("{}{}", group1, group2);
                             process_token_text_style_char(&mut this_token);
-    
+
                             // 添加概要到结构树
                             let synopsis = Synopsis {
                                 synopsis: group2.trim().to_string(),
                                 line: this_token.line,
                             };
-    
+
                             if self.current_depth == 0 {
                                 if let Some(last_scen) = &mut self.last_scen_structure_token {
                                     last_scen.synopses.push(synopsis);
@@ -1936,26 +1936,26 @@ impl FountainParser {
                                 }
                             }
                         }
-    
+
                         self.push_token(this_token);
                         continue;
                     } else if BLOCK_REGEX.get("lyric").unwrap().is_match(&self.text_valid) {
                         // 处理歌词
                         self.process_title_page_end(i);
                         this_token.token_type = "lyric".to_string();
-    
+
                         let mt = Regex::new(r"^((?:.*?↻)?\s*)(\~)(\s*)(.*)").unwrap()
                             .captures(&self.text_display);
-    
+
                         if let Some(captures) = mt {
                             let group1 = captures.get(1).map_or("", |m| m.as_str());
                             let group3 = captures.get(3).map_or("", |m| m.as_str());
                             let group4 = captures.get(4).map_or("", |m| m.as_str());
-    
+
                             this_token.text = format!("{}{}{}", group1, group3, group4);
                             process_token_text_style_char(&mut this_token);
                         }
-    
+
                         self.push_token(this_token);
                         continue;
                     } else {
@@ -1964,7 +1964,7 @@ impl FountainParser {
                         this_token.text = self.text_display.clone();
                         process_token_text_style_char(&mut this_token);
                         this_token = self.process_action_block(this_token);
-    
+
                         self.push_token(this_token);
                         continue;
                     }

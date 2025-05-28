@@ -1,5 +1,5 @@
 [package]
-name = "betterfountain-rust"
+name = "betterfountain_rust"
 version = "0.1.0"
 edition = "2021"
 authors = ["Arming"]
@@ -27,3 +27,4 @@ docx-rs = { git = "https://github.com/bokuweb/docx-rs.git", branch = "0.4.18-rc4
 base64 = "0.13.1"
 zip = "0.5.13"
 tokio = { version = "1", features = ["full"] }
+

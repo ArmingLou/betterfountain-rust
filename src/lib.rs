@@ -3,6 +3,7 @@ pub mod utils;
 pub mod parser;
 pub mod docx;
 pub mod pdf;
+pub mod api;
 
 pub use models::{
     ScriptToken,
@@ -26,6 +27,15 @@ pub use docx::{
     DocxOptions,
     DocxResult,
     generate_docx
+};
+
+pub use api::{
+    SimpleConf,
+    ExportResult,
+    parse_fountain_text,
+    export_to_docx,
+    export_to_docx_base64,
+    test_connection
 };
 
 /// 解析Fountain格式文本
