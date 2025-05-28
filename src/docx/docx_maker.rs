@@ -2586,6 +2586,69 @@ pub fn generate(
                         );
                     }
                 }
+            } else if token_type == "centered" {
+                // 非对话元素：完成缓存的中文格式对话和双对话
+                if china_format > 0 {
+                    doc.finish_china_dial_first(if scene_or_section_or_tran_started {
+                        &mut section_main
+                    } else {
+                        &mut section_main_no_page_num
+                    });
+                }
+
+                // 完成双对话处理 - 现在使用全局缓存
+                doc.finish_double_dial(
+                    if scene_or_section_or_tran_started {
+                        &mut section_main
+                    } else {
+                        &mut section_main_no_page_num
+                    },
+                    &print,
+                );
+
+                // 创建段落
+                let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
+                paragraph.style("action");
+
+                // 设置缩进
+                paragraph.indent(action_indent);
+                paragraph.align(crate::docx::adapter::AlignmentType::Center);
+
+                // 处理文本
+                let mut text = line.text.clone();
+
+
+                // 创建文本运行
+                let mut options_map = HashMap::new();
+                options_map.insert("color".to_string(), "#000000".to_string());
+
+                let text_runs = doc.text2(
+                    &text,
+                    &options_map,
+                    if bottom_notes {
+                        Some(&mut current_line_notes)
+                    } else {
+                        None
+                    },
+                    Some(&mut notes_page),
+                );
+
+                // 添加文本运行到段落
+                for run in text_runs {
+                    paragraph.add_text_run(run);
+                }
+
+                // 添加段落到相应的 section
+                if scene_or_section_or_tran_started {
+                    section_main.children.push(
+                        crate::docx::adapter::docx::SectionChild::Paragraph(paragraph),
+                    );
+                } else {
+                    section_main_no_page_num.children.push(
+                        crate::docx::adapter::docx::SectionChild::Paragraph(paragraph),
+                    );
+                }
+
             } else if token_type == "synopsis" {
                 // 处理 synopsis - 参考原项目逻辑
                 let mut feed = print.synopsis.feed.unwrap_or(print.action.feed);
