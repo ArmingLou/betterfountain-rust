@@ -1716,7 +1716,7 @@ fn add_tag_after_broken_note(input: String, tag: String) -> String {
     let style_chars = FountainConstants::style_chars();
 
     let note_begin = style_chars.get("note_begin").unwrap(); // "↺"
-    let note_end = style_chars.get("note_end").unwrap();     // "↻"
+    let note_end = style_chars.get("note_end").unwrap(); // "↻"
 
     // 查找 note_end 的位置
     if let Some(iend) = input.find(note_end) {
@@ -1995,13 +1995,9 @@ fn add_paragraph_and_update_line_map(
 ) {
     // 添加段落到相应的 section
     if scene_or_section_or_tran_started {
-        section_main.children.push(
-            child,
-        );
+        section_main.children.push(child);
     } else {
-        section_main_no_page_num.children.push(
-            child,
-        );
+        section_main_no_page_num.children.push(child);
     }
 
     // 更新行映射
@@ -2034,10 +2030,7 @@ fn add_text_runs_to_paragraph(
 }
 
 /// 处理场景编号的辅助函数
-fn process_scene_number(
-    scene_number: &str,
-    scenes_numbers: &str,
-) -> (String, String) {
+fn process_scene_number(scene_number: &str, scenes_numbers: &str) -> (String, String) {
     let scene_text_length = scene_number.chars().count();
 
     let left_char = if scene_text_length < 3 {
@@ -2354,11 +2347,6 @@ pub fn generate(
     // 添加样式定义
     doc.add_document_styles();
 
-    // 预计算常用的样式字符（避免重复获取）
-    use crate::utils::fountain_constants::FountainConstants;
-    let style_chars = FountainConstants::style_chars();
-    let _bold_char = style_chars["bold"];
-    let _underline_char = style_chars["underline"];
 
     // 预计算常用的选项映射（避免重复创建）
     let default_text_options = create_basic_options_map("#000000");
@@ -2524,7 +2512,7 @@ pub fn generate(
                     &mut section_main_no_page_num,
                     &print,
                 );
-                
+
                 if !scene_or_section_or_tran_started {
                     scene_or_section_or_tran_started = true;
                 }
@@ -2577,15 +2565,16 @@ pub fn generate(
 
                 if cfg.embolden_scene_headers {
                     // 使用特殊字符 ↭ 表示粗体
-                    text = format!("{}{}{}", style_chars["bold"], text, style_chars["bold"]);
+                    text = add_tag_after_broken_note(text, style_chars["bold"].to_string())
+                        + &style_chars["bold"].to_string();
                 }
                 if cfg.underline_scene_headers {
                     // 使用特殊字符 ☄ 表示下划线
-                    text = format!(
-                        "{}{}{}",
-                        style_chars["underline"], text, style_chars["underline"]
-                    );
+                    text = add_tag_after_broken_note(text, style_chars["underline"].to_string())
+                        + &style_chars["underline"].to_string();
                 }
+                
+                text = if_reset_format(text, line);
 
                 // 创建文本运行
                 let mut scene_options = default_text_options.clone();
@@ -2641,6 +2630,7 @@ pub fn generate(
 
                 // 处理文本
                 let mut text = line.text.clone();
+                text = if_reset_format(text, line);
 
                 // 添加三角形（国内剧本格式）
                 if (china_format == 1 || china_format == 3) && scene_started {
@@ -2688,7 +2678,7 @@ pub fn generate(
                     &mut section_main_no_page_num,
                     &print,
                 );
-
+                
                 // 创建段落
                 let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
                 paragraph.style("action");
@@ -2698,8 +2688,8 @@ pub fn generate(
                 paragraph.align(crate::docx::adapter::AlignmentType::Center);
 
                 // 处理文本
-                let text = line.text.clone();
-
+                let mut text = line.text.clone();
+                text = if_reset_format(text, line);
 
                 // 创建文本运行
                 let text_runs = doc.text2(
@@ -2731,7 +2721,6 @@ pub fn generate(
                     current_page,
                     current_duration,
                 );
-
             } else if token_type == "synopsis" {
                 // 对话块结束，额外处理 (双对话 / 国内剧本对话) - 参考原项目逻辑
                 finish_dialogue_processing(
@@ -2743,7 +2732,7 @@ pub fn generate(
                     &mut section_main_no_page_num,
                     &print,
                 );
-                
+
                 // 处理 synopsis - 参考原项目逻辑
                 let mut feed = print.synopsis.feed.unwrap_or(print.action.feed);
 
@@ -2769,7 +2758,8 @@ pub fn generate(
                 paragraph.indent_right(section_indent);
 
                 // 处理文本
-                let text = line.text.clone();
+                let mut text = line.text.clone();
+                text = if_reset_format(text, line);
 
                 // 创建文本运行
                 let text_runs = doc.text2(
@@ -2827,6 +2817,7 @@ pub fn generate(
 
                 // 处理文本
                 let mut text = line.text.clone();
+                
 
                 // 处理角色名
                 if line.token_type == "character" {
@@ -2835,17 +2826,18 @@ pub fn generate(
                         // 使用样式字符常量
                         use crate::utils::fountain_constants::FountainConstants;
                         let style_chars = FountainConstants::style_chars();
-                        let bold_char = style_chars["bold"];
 
                         // 检查是否以 text_contd 结尾
                         if text.ends_with(&cfg.text_contd) {
                             let base_text = &text[..text.len() - cfg.text_contd.len()];
-                            text = format!(
-                                "{}{}{}{}",
-                                bold_char, base_text, bold_char, cfg.text_contd
-                            );
+                            text = add_tag_after_broken_note(
+                                base_text.to_string(),
+                                style_chars["bold"].to_string(),
+                            ) + &style_chars["bold"].to_string()
+                                + cfg.text_contd.as_str();
                         } else {
-                            text = format!("{}{}{}", bold_char, text, bold_char);
+                            text = add_tag_after_broken_note(text, style_chars["bold"].to_string())
+                                + &style_chars["bold"].to_string();
                         }
                     }
 
@@ -2862,6 +2854,8 @@ pub fn generate(
                         text = format!("{}: ", text);
                     }
                 }
+                
+                text = if_reset_format(text, line);
 
                 // 创建文本运行
                 let text_runs = doc.text2(
@@ -3288,7 +3282,8 @@ pub fn generate(
                 }
 
                 // 处理文本
-                let text = line.text.clone();
+                let mut text = line.text.clone();
+                text = if_reset_format(text, line);
 
                 // 创建文本运行
                 let section_options = if let Some(color) = print.section.color.as_ref() {
@@ -3407,6 +3402,8 @@ pub fn generate(
                 if is_shot_cut {
                     transition_options.insert("bold".to_string(), "true".to_string());
                 }
+                
+                text = if_reset_format(text, line);
 
                 let text_runs = doc.text2(
                     &text,
@@ -3448,10 +3445,10 @@ pub fn generate(
                     &mut section_main_no_page_num,
                     &print,
                 );
-                
+
                 // 更新页码
                 current_page += 1;
-                
+
                 // 添加段落到相应section并更新行映射
                 add_paragraph_and_update_line_map(
                     crate::docx::adapter::docx::SectionChild::PageBreak,
@@ -3465,7 +3462,6 @@ pub fn generate(
                     current_page,
                     current_duration,
                 );
-
             } else {
                 // 对话块结束，额外处理 (双对话 / 国内剧本对话) - 参考原项目逻辑
                 finish_dialogue_processing(
@@ -3597,7 +3593,8 @@ pub fn generate(
 
                     // 创建文本运行 - 参考原项目使用固定颜色 #868686
                     let mut footnote_options = create_basic_options_map("#868686");
-                    footnote_options.insert("fontSize".to_string(), print.note_font_size.to_string());
+                    footnote_options
+                        .insert("fontSize".to_string(), print.note_font_size.to_string());
                     footnote_options.insert("characterSpacing".to_string(), "0".to_string());
 
                     let text_runs = doc.format_text(&text, &footnote_options);
