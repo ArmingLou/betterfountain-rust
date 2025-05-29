@@ -1,17 +1,9 @@
-use std::collections::{HashMap, HashSet};
-use regex::Regex;
-use lazy_static::lazy_static;
 use crate::models::{
-    Conf,
-    Location,
-    ScriptToken,
-    ScreenplayProperties,
-    StructToken,
-    Position,
-    Range,
-    Synopsis,
-    Note
+    Conf, Location, Note, Position, Range, ScreenplayProperties, ScriptToken, StructToken, Synopsis,
 };
+use lazy_static::lazy_static;
+use regex::Regex;
+use std::collections::{HashMap, HashSet};
 
 /// 行结构体，用于存储处理后的行信息
 #[derive(Debug, Clone, serde::Serialize)]
@@ -34,11 +26,13 @@ pub struct Line {
     pub number: Option<String>,
     /// 双对话位置: 'left' 或 'right'
     pub dual: Option<String>,
-    pub level: Option<i32>,  // 层级
+    pub level: Option<i32>, // 层级
 }
+use crate::parser::text_processor::{
+    generate_html, generate_title_html, process_token_text_style_char,
+};
 use crate::utils::fountain_constants::BLOCK_REGEX;
-use crate::utils::{FountainConstants, is_blank_line_after_style};
-use crate::parser::text_processor::{process_token_text_style_char, generate_html, generate_title_html};
+use crate::utils::{is_blank_line_after_style, FountainConstants};
 
 // 扩展Vec类型添加pushSorted方法
 pub trait SortedList<T> {
@@ -212,7 +206,7 @@ impl FountainParser {
         text: &str,
         config_x: Option<f64>,
         config_long: Option<f64>,
-        config_short: Option<f64>
+        config_short: Option<f64>,
     ) -> f64 {
         let mut duration = 0.0;
         let x = config_x.unwrap_or(0.3); // 默认值: 0.3秒/字符
@@ -286,7 +280,7 @@ impl FountainParser {
                 text_without_notes,
                 Some(self.result.dial_sec_per_char),
                 Some(self.result.dial_sec_per_punc_long),
-                Some(self.result.dial_sec_per_punc_short)
+                Some(self.result.dial_sec_per_punc_short),
             );
             token.time = Some(time);
             self.result.length_dialogue += time;
@@ -301,7 +295,10 @@ impl FountainParser {
                         if let Some(structs) = last_map.get("structs") {
                             if let Some(structs_array) = structs.as_array() {
                                 for struct_token in structs_array {
-                                    if struct_token == &serde_json::to_value(&last_scen_structure_token).unwrap() {
+                                    if struct_token
+                                        == &serde_json::to_value(&last_scen_structure_token)
+                                            .unwrap()
+                                    {
                                         need = true;
                                         break;
                                     }
@@ -313,10 +310,15 @@ impl FountainParser {
 
                 if need {
                     if let Some(last_map) = self.shot_cut_strct_tokens.last_mut() {
-                        let duration = last_map.get("duration")
+                        let duration = last_map
+                            .get("duration")
                             .and_then(|v| v.as_f64())
-                            .unwrap_or(0.0) + time;
-                        last_map.insert("duration".to_string(), serde_json::to_value(duration).unwrap());
+                            .unwrap_or(0.0)
+                            + time;
+                        last_map.insert(
+                            "duration".to_string(),
+                            serde_json::to_value(duration).unwrap(),
+                        );
                     }
                 } else {
                     last_scen_structure_token.duration_sec += time;
@@ -349,7 +351,10 @@ impl FountainParser {
             token.text_no_notes = Some(self.text_valid.clone());
             let text_without_notes = &self.text_valid;
 
-            let time = self.calculate_action_duration(text_without_notes, Some(self.result.action_sec_per_char));
+            let time = self.calculate_action_duration(
+                text_without_notes,
+                Some(self.result.action_sec_per_char),
+            );
             token.time = Some(time);
             self.result.length_action += time;
             self.play_time_sec += time;
@@ -363,7 +368,10 @@ impl FountainParser {
                         if let Some(structs) = last_map.get("structs") {
                             if let Some(structs_array) = structs.as_array() {
                                 for struct_token in structs_array {
-                                    if struct_token == &serde_json::to_value(&last_scen_structure_token).unwrap() {
+                                    if struct_token
+                                        == &serde_json::to_value(&last_scen_structure_token)
+                                            .unwrap()
+                                    {
                                         need = true;
                                         break;
                                     }
@@ -375,10 +383,15 @@ impl FountainParser {
 
                 if need {
                     if let Some(last_map) = self.shot_cut_strct_tokens.last_mut() {
-                        let duration = last_map.get("duration")
+                        let duration = last_map
+                            .get("duration")
                             .and_then(|v| v.as_f64())
-                            .unwrap_or(0.0) + time;
-                        last_map.insert("duration".to_string(), serde_json::to_value(duration).unwrap());
+                            .unwrap_or(0.0)
+                            + time;
+                        last_map.insert(
+                            "duration".to_string(),
+                            serde_json::to_value(duration).unwrap(),
+                        );
                     }
                 } else {
                     last_scen_structure_token.duration_sec += time;
@@ -390,7 +403,9 @@ impl FountainParser {
 
     // 处理标题页结束
     fn process_title_page_end(&mut self, line: usize) {
-        if self.result.properties.first_token_line.is_none() || self.result.properties.first_token_line == Some(usize::MAX) {
+        if self.result.properties.first_token_line.is_none()
+            || self.result.properties.first_token_line == Some(usize::MAX)
+        {
             self.result.properties.first_token_line = Some(line);
 
             // 在标题页结束时添加多个separator token（与Flutter版本保持一致）
@@ -422,7 +437,9 @@ impl FountainParser {
             return None;
         }
 
-        let split_location_from_time = Regex::new(r"(.*?)[\-–—−](.*)").ok()?.captures(match_result.get(2)?.as_str());
+        let split_location_from_time = Regex::new(r"(.*?)[\-–—−](.*)")
+            .ok()?
+            .captures(match_result.get(2)?.as_str());
 
         let group1 = match_result.get(1)?.as_str();
         let mut i = group1.contains('I');
@@ -464,7 +481,9 @@ impl FountainParser {
         } else {
             ""
         };
-        let day_t = day_t.to_uppercase().replace(|c: char| c.is_whitespace(), " ");
+        let day_t = day_t
+            .to_uppercase()
+            .replace(|c: char| c.is_whitespace(), " ");
 
         // 注释掉的逻辑（保持与原代码一致）
         // if i && e {
@@ -612,8 +631,14 @@ impl FountainParser {
                         level: 0,
                         notes: Vec::new(),
                         range: Some(Range {
-                            start: Position { line: line_number, character: 0 },
-                            end: Position { line: line_number, character: note_text.len() + 4 },
+                            start: Position {
+                                line: line_number,
+                                character: 0,
+                            },
+                            end: Position {
+                                line: line_number,
+                                character: note_text.len() + 4,
+                            },
                         }),
                         section: false,
                         synopses: Vec::new(),
@@ -673,9 +698,15 @@ impl FountainParser {
                             if cfg.print_notes {
                                 if part == "[[|" {
                                     // 扩展 note 语法。可强制个别注解不在底部而在原位置打印。
-                                    self.text_display.push_str(&format!("{}[", FountainConstants::style_chars()["note_begin_ext"]));
+                                    self.text_display.push_str(&format!(
+                                        "{}[",
+                                        FountainConstants::style_chars()["note_begin_ext"]
+                                    ));
                                 } else {
-                                    self.text_display.push_str(&format!("{}[", FountainConstants::style_chars()["note_begin"]));
+                                    self.text_display.push_str(&format!(
+                                        "{}[",
+                                        FountainConstants::style_chars()["note_begin"]
+                                    ));
                                 }
                             }
                         } else {
@@ -692,8 +723,10 @@ impl FountainParser {
                         self.nested_notes -= 1;
                         if self.nested_notes == 0 {
                             if cfg.print_notes {
-                                self.text_display.push_str(&format!("]{}",
-                                    FountainConstants::style_chars()["note_end"])); // 闭口，转换成特殊样式字符。
+                                self.text_display.push_str(&format!(
+                                    "]{}",
+                                    FountainConstants::style_chars()["note_end"]
+                                )); // 闭口，转换成特殊样式字符。
                             }
                         } else {
                             self.add_outline_note("]", line_num);
@@ -752,9 +785,18 @@ impl FountainParser {
         if !self.result.properties.scenes.is_empty() {
             let last_index = self.result.properties.scenes.len() - 1;
             if let Some(scene) = self.result.properties.scenes.get_mut(last_index) {
-                scene.insert("actionLength".to_string(), serde_json::to_value(action).unwrap());
-                scene.insert("dialogueLength".to_string(), serde_json::to_value(dialogue).unwrap());
-                scene.insert("endPlaySec".to_string(), serde_json::to_value(self.play_time_sec).unwrap());
+                scene.insert(
+                    "actionLength".to_string(),
+                    serde_json::to_value(action).unwrap(),
+                );
+                scene.insert(
+                    "dialogueLength".to_string(),
+                    serde_json::to_value(dialogue).unwrap(),
+                );
+                scene.insert(
+                    "endPlaySec".to_string(),
+                    serde_json::to_value(self.play_time_sec).unwrap(),
+                );
             }
         }
     }
@@ -942,10 +984,11 @@ impl FountainParser {
                 // 处理空行
                 if empty_break_line {
                     // 空行后的空行
-                    let skip_separator = (cfg.merge_empty_lines && last_was_separator) ||
-                        (ignored_last_token &&
-                         self.result.tokens.len() > 1 &&
-                         self.result.tokens[self.result.tokens.len() - 1].token_type == "separator");
+                    let skip_separator = (cfg.merge_empty_lines && last_was_separator)
+                        || (ignored_last_token
+                            && self.result.tokens.len() > 1
+                            && self.result.tokens[self.result.tokens.len() - 1].token_type
+                                == "separator");
 
                     if skip_separator {
                         continue;
@@ -994,7 +1037,8 @@ impl FountainParser {
                     self.result.state = "normal".to_string();
 
                     this_token.token_type = "separator".to_string();
-                    this_token.text = FountainConstants::style_chars()["style_global_clean"].to_string();
+                    this_token.text =
+                        FountainConstants::style_chars()["style_global_clean"].to_string();
                     self.result.tokens.push(this_token);
                     last_was_separator = true;
                 } else {
@@ -1009,7 +1053,16 @@ impl FountainParser {
                             if cfg.merge_empty_lines {
                                 if let Some(last_title) = &last_title_page_token {
                                     // 检查是否以换行符加空格结尾（替代前瞻断言）
-                                    if last_title.text.ends_with('\n') && last_title.text.chars().rev().skip(1).take_while(|&c| c == ' ').count() > 0 {
+                                    if last_title.text.ends_with('\n')
+                                        && last_title
+                                            .text
+                                            .chars()
+                                            .rev()
+                                            .skip(1)
+                                            .take_while(|&c| c == ' ')
+                                            .count()
+                                            > 0
+                                    {
                                         merge = true;
                                     }
                                 }
@@ -1049,14 +1102,26 @@ impl FountainParser {
             }
 
             // 检查是否是块开始行并且是标题页
-            if is_block_begin_line && self.regex.get("title_page").unwrap().is_match(&self.text_valid) {
+            if is_block_begin_line
+                && self
+                    .regex
+                    .get("title_page")
+                    .unwrap()
+                    .is_match(&self.text_valid)
+            {
                 self.result.state = "title_page".to_string();
             }
 
             // 处理标题页
             if self.result.state == "title_page" {
                 // 检查是否遇到了非标题页内容，如果是则结束标题页状态
-                if is_block_begin_line && !self.regex.get("title_page").unwrap().is_match(&self.text_valid) {
+                if is_block_begin_line
+                    && !self
+                        .regex
+                        .get("title_page")
+                        .unwrap()
+                        .is_match(&self.text_valid)
+                {
                     // 检查是否是标题页字段的延续行
                     if last_title_page_token.is_some() && !self.text_valid.trim().is_empty() {
                         // 这可能是标题页字段的延续行，不结束标题页状态
@@ -1068,13 +1133,22 @@ impl FountainParser {
                     }
                 }
 
-                if self.regex.get("title_page").unwrap().is_match(&self.text_valid) {
+                if self
+                    .regex
+                    .get("title_page")
+                    .unwrap()
+                    .is_match(&self.text_valid)
+                {
                     self.text_valid = self.text_valid.trim().to_string();
                     let index = self.text_valid.find(':').unwrap_or(0);
-                    this_token.token_type = self.text_valid[..index].to_lowercase().replace(' ', "_");
+                    this_token.token_type =
+                        self.text_valid[..index].to_lowercase().replace(' ', "_");
 
-                    let font_mt = Regex::new(r"(?i)^\s*(font|font italic|font bold|font bold italic|metadata)\:(.*)").unwrap()
-                        .captures(&self.text_valid);
+                    let font_mt = Regex::new(
+                        r"(?i)^\s*(font|font italic|font bold|font bold italic|metadata)\:(.*)",
+                    )
+                    .unwrap()
+                    .captures(&self.text_valid);
 
                     if let Some(captures) = font_mt {
                         font_title = true;
@@ -1087,7 +1161,11 @@ impl FountainParser {
                         if let Some(captures) = mt {
                             this_token.text = captures.get(3).unwrap().as_str().trim().to_string();
                             process_token_text_style_char(&mut this_token);
-                            this_token.text = format!("{}{}", FountainConstants::style_chars()["style_global_clean"], this_token.text);
+                            this_token.text = format!(
+                                "{}{}",
+                                FountainConstants::style_chars()["style_global_clean"],
+                                this_token.text
+                            );
                             last_is_blank_title = false;
                         }
                     }
@@ -1102,7 +1180,9 @@ impl FountainParser {
                         let position_key = position.position.clone();
 
                         if !self.result.title_page.contains_key(&position_key) {
-                            self.result.title_page.insert(position_key.clone(), Vec::new());
+                            self.result
+                                .title_page
+                                .insert(position_key.clone(), Vec::new());
                         }
 
                         if let Some(tokens) = self.result.title_page.get_mut(&position_key) {
@@ -1112,22 +1192,37 @@ impl FountainParser {
                         _empty_title_page = false;
                     }
 
-                    if !self.result.properties.title_keys.contains(&this_token.token_type) {
-                        self.result.properties.title_keys.push(this_token.token_type.clone());
+                    if !self
+                        .result
+                        .properties
+                        .title_keys
+                        .contains(&this_token.token_type)
+                    {
+                        self.result
+                            .properties
+                            .title_keys
+                            .push(this_token.token_type.clone());
                     }
 
                     continue;
                 }
 
                 // 处理标题页字段的延续内容或其他标题页状态下的内容
-                if self.result.state == "title_page" && !self.regex.get("title_page").unwrap().is_match(&self.text_valid) {
+                if self.result.state == "title_page"
+                    && !self
+                        .regex
+                        .get("title_page")
+                        .unwrap()
+                        .is_match(&self.text_valid)
+                {
                     // 标题页字段内容的换行内容，或者标题页状态下的其他内容
                     if font_title {
                         this_token.text = self.text_valid.trim().to_string();
                         if !this_token.text.is_empty() && last_title_page_token.is_some() {
                             let last_text = &last_title_page_token.as_ref().unwrap().text;
                             let separator = if last_text.is_empty() { "" } else { " " };
-                            let new_text = format!("{}{}{}", last_text, separator, this_token.text.trim());
+                            let new_text =
+                                format!("{}{}{}", last_text, separator, this_token.text.trim());
 
                             // 更新 last_title_page_token
                             last_title_page_token.as_mut().unwrap().text = new_text.clone();
@@ -1136,7 +1231,8 @@ impl FountainParser {
                             let token_type = &last_title_page_token.as_ref().unwrap().token_type;
                             if let Some(position) = self.get_title_page_position(token_type) {
                                 let position_key = position.position.clone();
-                                if let Some(tokens) = self.result.title_page.get_mut(&position_key) {
+                                if let Some(tokens) = self.result.title_page.get_mut(&position_key)
+                                {
                                     // 找到最后一个相同类型的 token 并更新其文本
                                     for token in tokens.iter_mut().rev() {
                                         if token.token_type == *token_type {
@@ -1154,34 +1250,49 @@ impl FountainParser {
                         let mut handled = false;
                         if cfg.merge_empty_lines {
                             let curr_blank = is_blank_line_after_style(&this_token.text);
-                            if curr_blank && last_is_blank_title && last_title_page_token.is_some() {
+                            if curr_blank && last_is_blank_title && last_title_page_token.is_some()
+                            {
                                 handled = true;
-                                let t = Regex::new(&format!(r"[{}]", regex::escape(FountainConstants::style_chars()["all"])))
-                                    .unwrap()
-                                    .replace_all(&this_token.text, "")
-                                    .to_string();
+                                let t = Regex::new(&format!(
+                                    r"[{}]",
+                                    regex::escape(FountainConstants::style_chars()["all"])
+                                ))
+                                .unwrap()
+                                .replace_all(&this_token.text, "")
+                                .to_string();
                                 last_title_page_token.as_mut().unwrap().text.push_str(&t);
                             }
                             last_is_blank_title = curr_blank;
                         }
 
                         if !handled && last_title_page_token.is_some() {
-                            let separator = if !is_blank_line_after_style(&last_title_page_token.as_ref().unwrap().text) {
+                            let separator = if !is_blank_line_after_style(
+                                &last_title_page_token.as_ref().unwrap().text,
+                            ) {
                                 "\n"
                             } else {
                                 ""
                             };
-                            last_title_page_token.as_mut().unwrap().text.push_str(&format!("{}{}", separator, this_token.text.trim()));
+                            last_title_page_token
+                                .as_mut()
+                                .unwrap()
+                                .text
+                                .push_str(&format!("{}{}", separator, this_token.text.trim()));
 
                             // 同时更新 title_page 中对应的 token
                             let token_type = &last_title_page_token.as_ref().unwrap().token_type;
                             if let Some(position) = self.get_title_page_position(token_type) {
                                 let position_key = position.position.clone();
-                                if let Some(tokens) = self.result.title_page.get_mut(&position_key) {
+                                if let Some(tokens) = self.result.title_page.get_mut(&position_key)
+                                {
                                     // 找到最后一个相同类型的 token 并更新其文本
                                     for token in tokens.iter_mut().rev() {
                                         if token.token_type == *token_type {
-                                            token.text = last_title_page_token.as_ref().unwrap().text.clone();
+                                            token.text = last_title_page_token
+                                                .as_ref()
+                                                .unwrap()
+                                                .text
+                                                .clone();
                                             break;
                                         }
                                     }
@@ -1203,20 +1314,31 @@ impl FountainParser {
                     process_token_text_style_char(&mut this_token);
 
                     // 为括号内容添加包装符号（与Flutter版本保持一致）
-                    this_token.text = format!("{}{}{}",
+                    this_token.text = format!(
+                        "{}{}{}",
                         FountainConstants::style_chars()["italic_global_begin"],
                         this_token.text,
                         FountainConstants::style_chars()["italic_global_end"]
                     );
 
                     // 检查是否是括号结束
-                    if self.regex.get("parenthetical_end").unwrap().is_match(&self.text_valid) {
+                    if self
+                        .regex
+                        .get("parenthetical_end")
+                        .unwrap()
+                        .is_match(&self.text_valid)
+                    {
                         parenthetical_open = false;
                     }
 
                     self.push_token(this_token);
                     continue;
-                } else if self.regex.get("parenthetical").unwrap().is_match(&self.text_valid) {
+                } else if self
+                    .regex
+                    .get("parenthetical")
+                    .unwrap()
+                    .is_match(&self.text_valid)
+                {
                     // 处理单行括号内容
                     this_token.token_type = "parenthetical".to_string();
                     this_token.dual = self.result.dual_str.clone();
@@ -1224,7 +1346,8 @@ impl FountainParser {
                     process_token_text_style_char(&mut this_token);
 
                     // 为括号内容添加包装符号（与Flutter版本保持一致）
-                    this_token.text = format!("{}{}{}",
+                    this_token.text = format!(
+                        "{}{}{}",
                         FountainConstants::style_chars()["italic_global_begin"],
                         this_token.text,
                         FountainConstants::style_chars()["italic_global_end"]
@@ -1232,7 +1355,12 @@ impl FountainParser {
 
                     self.push_token(this_token);
                     continue;
-                } else if self.regex.get("parenthetical_start").unwrap().is_match(&self.text_valid) {
+                } else if self
+                    .regex
+                    .get("parenthetical_start")
+                    .unwrap()
+                    .is_match(&self.text_valid)
+                {
                     // 处理多行括号开始
                     this_token.token_type = "parenthetical".to_string();
                     this_token.dual = self.result.dual_str.clone();
@@ -1240,7 +1368,8 @@ impl FountainParser {
                     process_token_text_style_char(&mut this_token);
 
                     // 为括号内容添加包装符号（与Flutter版本保持一致）
-                    this_token.text = format!("{}{}{}",
+                    this_token.text = format!(
+                        "{}{}{}",
                         FountainConstants::style_chars()["italic_global_begin"],
                         this_token.text,
                         FountainConstants::style_chars()["italic_global_end"]
@@ -1257,7 +1386,8 @@ impl FountainParser {
                     process_token_text_style_char(&mut this_token);
 
                     // 为对话添加包装符号（与Flutter版本保持一致）
-                    this_token.text = format!("{}{}{}",
+                    this_token.text = format!(
+                        "{}{}{}",
                         FountainConstants::style_chars()["italic_global_begin"],
                         this_token.text,
                         FountainConstants::style_chars()["italic_global_end"]
@@ -1275,12 +1405,18 @@ impl FountainParser {
             if self.result.state == "normal" {
                 let mut action = false;
                 if is_block_begin_line {
-
                     // 检查是否是场景标题
-                    if self.regex.get("scene_heading").unwrap().is_match(&self.text_valid) {
+                    if self
+                        .regex
+                        .get("scene_heading")
+                        .unwrap()
+                        .is_match(&self.text_valid)
+                    {
                         self.process_title_page_end(i);
 
-                        if self.result.properties.first_scene_line.is_none() || self.result.properties.first_scene_line == Some(usize::MAX) {
+                        if self.result.properties.first_scene_line.is_none()
+                            || self.result.properties.first_scene_line == Some(usize::MAX)
+                        {
                             self.result.properties.first_scene_line = Some(i);
 
                             // 从metadata里更新用户配置时间预估参数（与TypeScript版本保持一致）
@@ -1293,18 +1429,35 @@ impl FountainParser {
                                         } else {
                                             &token.text
                                         };
-                                        if let Ok(metadata) = serde_json::from_str::<serde_json::Value>(json_text) {
-                                            if let Some(dial_sec_per_char) = metadata.get("dial_sec_per_char").and_then(|v| v.as_f64()) {
+                                        if let Ok(metadata) =
+                                            serde_json::from_str::<serde_json::Value>(json_text)
+                                        {
+                                            if let Some(dial_sec_per_char) = metadata
+                                                .get("dial_sec_per_char")
+                                                .and_then(|v| v.as_f64())
+                                            {
                                                 self.result.dial_sec_per_char = dial_sec_per_char;
                                             }
-                                            if let Some(dial_sec_per_punc_short) = metadata.get("dial_sec_per_punc_short").and_then(|v| v.as_f64()) {
-                                                self.result.dial_sec_per_punc_short = dial_sec_per_punc_short;
+                                            if let Some(dial_sec_per_punc_short) = metadata
+                                                .get("dial_sec_per_punc_short")
+                                                .and_then(|v| v.as_f64())
+                                            {
+                                                self.result.dial_sec_per_punc_short =
+                                                    dial_sec_per_punc_short;
                                             }
-                                            if let Some(dial_sec_per_punc_long) = metadata.get("dial_sec_per_punc_long").and_then(|v| v.as_f64()) {
-                                                self.result.dial_sec_per_punc_long = dial_sec_per_punc_long;
+                                            if let Some(dial_sec_per_punc_long) = metadata
+                                                .get("dial_sec_per_punc_long")
+                                                .and_then(|v| v.as_f64())
+                                            {
+                                                self.result.dial_sec_per_punc_long =
+                                                    dial_sec_per_punc_long;
                                             }
-                                            if let Some(action_sec_per_char) = metadata.get("action_sec_per_char").and_then(|v| v.as_f64()) {
-                                                self.result.action_sec_per_char = action_sec_per_char;
+                                            if let Some(action_sec_per_char) = metadata
+                                                .get("action_sec_per_char")
+                                                .and_then(|v| v.as_f64())
+                                            {
+                                                self.result.action_sec_per_char =
+                                                    action_sec_per_char;
                                             }
                                         }
                                         break;
@@ -1315,12 +1468,20 @@ impl FountainParser {
 
                         self.force_not_dual = true;
                         // 去掉前面的点号
-                        self.text_display = Regex::new(r"^[ \t]*\.").unwrap()
-                            .replace(&self.text_display, "").to_string();
+                        self.text_display = Regex::new(r"^[ \t]*\.")
+                            .unwrap()
+                            .replace(&self.text_display, "")
+                            .to_string();
 
                         // 如果配置要求每个场景新页面，且不是第一个场景，添加分页符
                         if cfg.each_scene_on_new_page && self.scene_number != 1 {
-                            let page_break = self.create_token(Some(""), Some(0), Some(i), Some(text.len()), "page_break");
+                            let page_break = self.create_token(
+                                Some(""),
+                                Some(0),
+                                Some(i),
+                                Some(text.len()),
+                                "page_break",
+                            );
                             self.push_token(page_break);
                         }
 
@@ -1329,14 +1490,29 @@ impl FountainParser {
                         let mut scene_number_dup = false;
 
                         // 处理场景编号
-                        let mut text_for_token = Regex::new(r"^[ \t]*\.").unwrap()
-                            .replace(&self.text_valid, "").to_string();
+                        let mut text_for_token = Regex::new(r"^[ \t]*\.")
+                            .unwrap()
+                            .replace(&self.text_valid, "")
+                            .to_string();
 
-                        if let Some(scene_num_match) = self.regex.get("scene_number").unwrap().captures(&self.text_valid) {
-                            text_for_token = self.regex.get("scene_number").unwrap()
-                                .replace(&text_for_token, "").to_string();
-                            self.text_display = self.regex.get("scene_number").unwrap()
-                                .replace(&self.text_display, "").to_string();
+                        if let Some(scene_num_match) = self
+                            .regex
+                            .get("scene_number")
+                            .unwrap()
+                            .captures(&self.text_valid)
+                        {
+                            text_for_token = self
+                                .regex
+                                .get("scene_number")
+                                .unwrap()
+                                .replace(&text_for_token, "")
+                                .to_string();
+                            self.text_display = self
+                                .regex
+                                .get("scene_number")
+                                .unwrap()
+                                .replace(&self.text_display, "")
+                                .to_string();
 
                             // 处理场景编号
                             if let Some(group2) = scene_num_match.get(2) {
@@ -1374,26 +1550,34 @@ impl FountainParser {
                         // 标准化场景标题格式
                         let mut idx = text_for_token.find('-');
                         if let Some(pos) = idx {
-                            text_for_token = format!("{} - {}",
+                            text_for_token = format!(
+                                "{} - {}",
                                 &text_for_token[..pos],
-                                &text_for_token[pos+1..]);
+                                &text_for_token[pos + 1..]
+                            );
                         }
 
-                        text_for_token = text_for_token.to_uppercase()
+                        text_for_token = text_for_token
+                            .to_uppercase()
                             .replace(|c: char| c.is_whitespace(), " ");
 
                         idx = self.text_display.find('-');
                         if let Some(pos) = idx {
-                            self.text_display = format!("{} - {}",
+                            self.text_display = format!(
+                                "{} - {}",
                                 &self.text_display[..pos],
-                                &self.text_display[pos+1..]);
+                                &self.text_display[pos + 1..]
+                            );
                         }
 
-                        self.text_display = self.text_display.to_uppercase()
+                        self.text_display = self
+                            .text_display
+                            .to_uppercase()
                             .replace(|c: char| c.is_whitespace(), " ");
 
                         // 规范化空格：将多个连续空格替换为单个空格，并trim两端
-                        self.text_display = Regex::new(r"\s+").unwrap()
+                        self.text_display = Regex::new(r"\s+")
+                            .unwrap()
                             .replace_all(&self.text_display, " ")
                             .trim()
                             .to_string();
@@ -1401,13 +1585,24 @@ impl FountainParser {
                         // 去掉场景标题前面的点号（与Flutter版本保持一致）
                         this_token.text = self.text_display.clone();
                         if this_token.text.trim_start().starts_with('.') {
-                            this_token.text = this_token.text.trim_start().chars().skip(1).collect::<String>().trim_start().to_string();
+                            this_token.text = this_token
+                                .text
+                                .trim_start()
+                                .chars()
+                                .skip(1)
+                                .collect::<String>()
+                                .trim_start()
+                                .to_string();
                         }
                         this_token.text_no_notes = Some(text_for_token.clone());
 
                         // 创建结构树节点
                         let mut cobj = StructToken {
-                            text: format!("{} {}", this_token.number.clone().unwrap_or_default(), text_for_token.clone()),
+                            text: format!(
+                                "{} {}",
+                                this_token.number.clone().unwrap_or_default(),
+                                text_for_token.clone()
+                            ),
                             children: Vec::new(),
                             level: 0,
                             section: false,
@@ -1418,8 +1613,14 @@ impl FountainParser {
                             dialogue_end_line: 0,
                             duration_sec: 0.0,
                             range: Some(Range {
-                                start: Position { line: this_token.line, character: 0 },
-                                end: Position { line: this_token.line, character: self.text_valid.len() },
+                                start: Position {
+                                    line: this_token.line,
+                                    character: 0,
+                                },
+                                end: Position {
+                                    line: this_token.line,
+                                    character: self.text_valid.len(),
+                                },
                             }),
                             id: None,
                             isnote: false,
@@ -1434,7 +1635,11 @@ impl FountainParser {
                             self.result.properties.structure.push(cobj.clone());
                         } else {
                             if let Some(level) = self.latest_section(self.current_depth) {
-                                cobj.id = Some(format!("{}/{}", level.id.as_ref().unwrap_or(&String::new()), this_token.line));
+                                cobj.id = Some(format!(
+                                    "{}/{}",
+                                    level.id.as_ref().unwrap_or(&String::new()),
+                                    this_token.line
+                                ));
 
                                 // 找到父节点并添加子节点
                                 for parent in &mut self.result.properties.structure {
@@ -1456,7 +1661,8 @@ impl FountainParser {
                             if let Some(last_map) = self.shot_cut_strct_tokens.last_mut() {
                                 if let Some(structs) = last_map.get_mut("structs") {
                                     if let Some(structs_array) = structs.as_array_mut() {
-                                        structs_array.push(serde_json::to_value(cobj.clone()).unwrap());
+                                        structs_array
+                                            .push(serde_json::to_value(cobj.clone()).unwrap());
                                     }
                                 }
                             }
@@ -1468,25 +1674,53 @@ impl FountainParser {
                         if !self.result.properties.scenes.is_empty() {
                             let last_index = self.result.properties.scenes.len() - 1;
                             if let Some(scene) = self.result.properties.scenes.get_mut(last_index) {
-                                scene.insert("endPlaySec".to_string(), serde_json::to_value(self.play_time_sec).unwrap());
+                                scene.insert(
+                                    "endPlaySec".to_string(),
+                                    serde_json::to_value(self.play_time_sec).unwrap(),
+                                );
                             }
                         }
 
                         // 添加新场景
                         let mut scene_map = HashMap::new();
-                        scene_map.insert("scene".to_string(), serde_json::to_value(nb.clone()).unwrap());
-                        scene_map.insert("text".to_string(), serde_json::to_value(text_for_token.clone()).unwrap());
-                        scene_map.insert("line".to_string(), serde_json::to_value(this_token.line).unwrap());
-                        scene_map.insert("actionLength".to_string(), serde_json::to_value(0).unwrap());
-                        scene_map.insert("dialogueLength".to_string(), serde_json::to_value(0).unwrap());
-                        scene_map.insert("number".to_string(), serde_json::to_value(nb.clone()).unwrap());
-                        scene_map.insert("startPlaySec".to_string(), serde_json::to_value(self.play_time_sec).unwrap());
-                        scene_map.insert("endPlaySec".to_string(), serde_json::to_value(self.play_time_sec).unwrap());
+                        scene_map.insert(
+                            "scene".to_string(),
+                            serde_json::to_value(nb.clone()).unwrap(),
+                        );
+                        scene_map.insert(
+                            "text".to_string(),
+                            serde_json::to_value(text_for_token.clone()).unwrap(),
+                        );
+                        scene_map.insert(
+                            "line".to_string(),
+                            serde_json::to_value(this_token.line).unwrap(),
+                        );
+                        scene_map
+                            .insert("actionLength".to_string(), serde_json::to_value(0).unwrap());
+                        scene_map.insert(
+                            "dialogueLength".to_string(),
+                            serde_json::to_value(0).unwrap(),
+                        );
+                        scene_map.insert(
+                            "number".to_string(),
+                            serde_json::to_value(nb.clone()).unwrap(),
+                        );
+                        scene_map.insert(
+                            "startPlaySec".to_string(),
+                            serde_json::to_value(self.play_time_sec).unwrap(),
+                        );
+                        scene_map.insert(
+                            "endPlaySec".to_string(),
+                            serde_json::to_value(self.play_time_sec).unwrap(),
+                        );
 
                         // println!("DEBUG: 添加场景 {} (行号: {})", nb, this_token.line);
-                    self.result.properties.scenes.push(scene_map);
+                        self.result.properties.scenes.push(scene_map);
                         self.result.properties.scene_lines.push(this_token.line);
-                        self.result.properties.scene_names.push(self.text_valid.clone());
+                        self.result
+                            .properties
+                            .scene_names
+                            .push(self.text_valid.clone());
 
                         // 处理场景位置信息
                         if let Some(location) = self.parse_location_information(&self.text_valid) {
@@ -1503,7 +1737,9 @@ impl FountainParser {
                                 loc.line = this_token.line;
                                 loc.start_play_sec = self.play_time_sec;
 
-                                if let Some(locations) = self.result.properties.locations.get_mut(&sl) {
+                                if let Some(locations) =
+                                    self.result.properties.locations.get_mut(&sl)
+                                {
                                     if !locations.iter().any(|it| it.line == this_token.line) {
                                         locations.push(loc);
                                     }
@@ -1520,13 +1756,27 @@ impl FountainParser {
 
                         self.push_token(this_token);
                         continue;
-                    } else if self.regex.get("centered").unwrap().is_match(&self.text_valid) {
+                    } else if self
+                        .regex
+                        .get("centered")
+                        .unwrap()
+                        .is_match(&self.text_valid)
+                    {
                         // 处理居中文本
                         action = true;
-                    } else if self.regex.get("transition").unwrap().is_match(&self.text_valid) {
+                    } else if self
+                        .regex
+                        .get("transition")
+                        .unwrap()
+                        .is_match(&self.text_valid)
+                    {
                         // 处理转场
                         // 处理镜头交切标志
-                        let match_display = self.regex.get("transition").unwrap().captures(&self.text_valid);
+                        let match_display = self
+                            .regex
+                            .get("transition")
+                            .unwrap()
+                            .captures(&self.text_valid);
 
                         if let Some(captures) = match_display {
                             if captures.len() > 2 && captures.get(2).is_some() {
@@ -1535,22 +1785,32 @@ impl FountainParser {
                                 if tx.starts_with("{+") && tx.ends_with("+} ↓") {
                                     self.shot_cut = 1;
                                     let mut shot_cut_map = HashMap::new();
-                                    shot_cut_map.insert("duration".to_string(), serde_json::to_value(0.0).unwrap());
+                                    shot_cut_map.insert(
+                                        "duration".to_string(),
+                                        serde_json::to_value(0.0).unwrap(),
+                                    );
 
                                     let mut structs = Vec::new();
                                     if let Some(last_scen) = &self.last_scen_structure_token {
                                         structs.push(serde_json::to_value(last_scen).unwrap());
                                     }
 
-                                    shot_cut_map.insert("structs".to_string(), serde_json::to_value(structs).unwrap());
+                                    shot_cut_map.insert(
+                                        "structs".to_string(),
+                                        serde_json::to_value(structs).unwrap(),
+                                    );
                                     self.shot_cut_strct_tokens.push(shot_cut_map);
                                 } else if tx.starts_with("{#") && tx.ends_with("#} ↓") {
                                     self.shot_cut = 2;
                                     let mut shot_cut_map = HashMap::new();
-                                    shot_cut_map.insert("duration".to_string(), serde_json::to_value(0.0).unwrap());
+                                    shot_cut_map.insert(
+                                        "duration".to_string(),
+                                        serde_json::to_value(0.0).unwrap(),
+                                    );
 
                                     let mut structs = Vec::new();
-                                    if let Some(last_scen_pre) = &self.last_scen_structure_token_pre {
+                                    if let Some(last_scen_pre) = &self.last_scen_structure_token_pre
+                                    {
                                         structs.push(serde_json::to_value(last_scen_pre).unwrap());
                                     }
 
@@ -1558,13 +1818,22 @@ impl FountainParser {
                                         structs.push(serde_json::to_value(last_scen).unwrap());
                                     }
 
-                                    shot_cut_map.insert("structs".to_string(), serde_json::to_value(structs).unwrap());
+                                    shot_cut_map.insert(
+                                        "structs".to_string(),
+                                        serde_json::to_value(structs).unwrap(),
+                                    );
                                     self.shot_cut_strct_tokens.push(shot_cut_map);
                                 } else if tx.starts_with("{=") && tx.ends_with("=} ↓") {
                                     self.shot_cut = 3;
                                     let mut shot_cut_map = HashMap::new();
-                                    shot_cut_map.insert("duration".to_string(), serde_json::to_value(0.0).unwrap());
-                                    shot_cut_map.insert("structs".to_string(), serde_json::to_value(Vec::<StructToken>::new()).unwrap());
+                                    shot_cut_map.insert(
+                                        "duration".to_string(),
+                                        serde_json::to_value(0.0).unwrap(),
+                                    );
+                                    shot_cut_map.insert(
+                                        "structs".to_string(),
+                                        serde_json::to_value(Vec::<StructToken>::new()).unwrap(),
+                                    );
                                     self.shot_cut_strct_tokens.push(shot_cut_map);
                                 } else if tx.starts_with("{-") && tx.ends_with("-} ↑") {
                                     self.shot_cut = 0;
@@ -1573,15 +1842,22 @@ impl FountainParser {
                         }
 
                         self.process_title_page_end(i);
-                        this_token.text = Regex::new(r"^\s*>\s*").unwrap()
-                            .replace(&self.text_display, "").to_string();
+                        this_token.text = Regex::new(r"^\s*>\s*")
+                            .unwrap()
+                            .replace(&self.text_display, "")
+                            .to_string();
 
                         process_token_text_style_char(&mut this_token);
                         this_token.token_type = "transition".to_string();
 
                         self.push_token(this_token);
                         continue;
-                    } else if self.regex.get("character").unwrap().is_match(&self.text_valid) {
+                    } else if self
+                        .regex
+                        .get("character")
+                        .unwrap()
+                        .is_match(&self.text_valid)
+                    {
                         // 处理角色
                         self.process_title_page_end(i);
                         self.result.state = "dialogue".to_string();
@@ -1602,13 +1878,22 @@ impl FountainParser {
                                 let mut mod_last = false;
                                 let mut last_character_index = last_character_index;
 
-                                while last_character_index < self.result.tokens.len() &&
-                                      dialogue_tokens.contains(&self.result.tokens[last_character_index].token_type.as_str()) {
-                                    let old_last_dual = self.result.tokens[last_character_index].dual.clone();
+                                while last_character_index < self.result.tokens.len()
+                                    && dialogue_tokens.contains(
+                                        &self.result.tokens[last_character_index]
+                                            .token_type
+                                            .as_str(),
+                                    )
+                                {
+                                    let old_last_dual =
+                                        self.result.tokens[last_character_index].dual.clone();
 
-                                    if old_last_dual.is_none() || old_last_dual.as_ref().unwrap().is_empty() {
+                                    if old_last_dual.is_none()
+                                        || old_last_dual.as_ref().unwrap().is_empty()
+                                    {
                                         mod_last = true;
-                                        self.result.tokens[last_character_index].dual = Some("left".to_string());
+                                        self.result.tokens[last_character_index].dual =
+                                            Some("left".to_string());
                                         self.result.dual_str = Some("right".to_string());
                                     } else if old_last_dual.as_ref().unwrap() == "left" {
                                         self.result.dual_str = Some("right".to_string());
@@ -1630,19 +1915,27 @@ impl FountainParser {
                                             "dialogue_end" => {
                                                 self.result.tokens.truncate(temp_index);
                                                 temp_index -= 1;
-                                            },
-                                            "separator" | "character" | "dialogue" | "parenthetical" => {},
+                                            }
+                                            "separator" | "character" | "dialogue"
+                                            | "parenthetical" => {}
                                             "dialogue_begin" => {
-                                                self.result.tokens[temp_index].token_type = "dual_dialogue_begin".to_string();
+                                                self.result.tokens[temp_index].token_type =
+                                                    "dual_dialogue_begin".to_string();
                                                 found_match = true;
-                                            },
-                                            _ => found_match = true
+                                            }
+                                            _ => found_match = true,
                                         }
                                     }
                                 }
 
                                 if self.result.dual_str.as_ref().unwrap() == "left" {
-                                    self.push_token(self.create_token(None, None, None, None, "dual_dialogue_begin"));
+                                    self.push_token(self.create_token(
+                                        None,
+                                        None,
+                                        None,
+                                        None,
+                                        "dual_dialogue_begin",
+                                    ));
                                 } else {
                                     // 删除之前left的dual_dialogue_end
                                     let mut found_match = false;
@@ -1654,55 +1947,86 @@ impl FountainParser {
                                             "dual_dialogue_end" => {
                                                 self.result.tokens.truncate(temp_index);
                                                 temp_index -= 1;
-                                            },
-                                            "separator" | "character" | "dialogue" | "parenthetical" => {},
-                                            _ => found_match = true
+                                            }
+                                            "separator" | "character" | "dialogue"
+                                            | "parenthetical" => {}
+                                            _ => found_match = true,
                                         }
                                     }
                                 }
 
                                 this_token.dual = self.result.dual_str.clone();
                             } else {
-                                self.push_token(self.create_token(None, None, None, None, "dialogue_begin"));
+                                self.push_token(self.create_token(
+                                    None,
+                                    None,
+                                    None,
+                                    None,
+                                    "dialogue_begin",
+                                ));
                             }
 
                             // 移除角色名后的^符号
-                            text_valid = Regex::new(r"\^\s*$").unwrap().replace(&text_valid, "").to_string();
+                            text_valid = Regex::new(r"\^\s*$")
+                                .unwrap()
+                                .replace(&text_valid, "")
+                                .to_string();
 
                             // 替代前瞻性判断的实现：分别处理三种情况
                             // 1. ^空白字符后跟注释开始符号 இ
-                            if let Some(captures) = Regex::new(r"(\^\s*)(இ.*$)").unwrap().captures(&self.text_display) {
+                            if let Some(captures) = Regex::new(r"(\^\s*)(இ.*$)")
+                                .unwrap()
+                                .captures(&self.text_display)
+                            {
                                 let note_part = captures.get(2).map_or("", |m| m.as_str());
                                 self.text_display = note_part.to_string();
                             }
                             // 2. ^空白字符后跟注释开始符号 ↺
-                            else if let Some(captures) = Regex::new(r"(\^\s*)(↺.*$)").unwrap().captures(&self.text_display) {
+                            else if let Some(captures) = Regex::new(r"(\^\s*)(↺.*$)")
+                                .unwrap()
+                                .captures(&self.text_display)
+                            {
                                 let note_part = captures.get(2).map_or("", |m| m.as_str());
                                 self.text_display = note_part.to_string();
                             }
                             // 3. ^空白字符在行尾
                             else {
-                                self.text_display = Regex::new(r"\^\s*$").unwrap()
-                                    .replace(&self.text_display, "").to_string();
+                                self.text_display = Regex::new(r"\^\s*$")
+                                    .unwrap()
+                                    .replace(&self.text_display, "")
+                                    .to_string();
                             }
                         } else {
-                            self.push_token(self.create_token(None, None, None, None, "dialogue_begin"));
+                            self.push_token(self.create_token(
+                                None,
+                                None,
+                                None,
+                                None,
+                                "dialogue_begin",
+                            ));
                         }
 
                         self.force_not_dual = false;
-                        let character = self.trim_character_extension(&text_valid).trim().to_string();
+                        let character = self
+                            .trim_character_extension(&text_valid)
+                            .trim()
+                            .to_string();
                         _previous_character = Some(character.clone());
                         this_token.character = Some(character.clone());
 
                         // 更新角色信息
                         let scene_idx = self.result.properties.scenes.len().saturating_sub(1);
 
-                        if let Some(values) = self.result.properties.characters.get_mut(&character) {
+                        if let Some(values) = self.result.properties.characters.get_mut(&character)
+                        {
                             if !values.contains(&scene_idx) {
                                 values.push(scene_idx);
                             }
                         } else {
-                            self.result.properties.characters.insert(character.clone(), vec![scene_idx]);
+                            self.result
+                                .properties
+                                .characters
+                                .insert(character.clone(), vec![scene_idx]);
                         }
 
                         if self.result.properties.character_lines.is_none() {
@@ -1714,22 +2038,34 @@ impl FountainParser {
                         }
 
                         if self.result.properties.scenes.is_empty() {
-                            if self.result.properties.character_first_line.is_none() ||
-                               !self.result.properties.character_first_line.as_ref().unwrap().contains_key(&character) {
-
+                            if self.result.properties.character_first_line.is_none()
+                                || !self
+                                    .result
+                                    .properties
+                                    .character_first_line
+                                    .as_ref()
+                                    .unwrap()
+                                    .contains_key(&character)
+                            {
                                 if self.result.properties.character_first_line.is_none() {
-                                    self.result.properties.character_first_line = Some(HashMap::new());
+                                    self.result.properties.character_first_line =
+                                        Some(HashMap::new());
                                 }
 
-                                if let Some(char_first_line) = &mut self.result.properties.character_first_line {
+                                if let Some(char_first_line) =
+                                    &mut self.result.properties.character_first_line
+                                {
                                     char_first_line.insert(character.clone(), this_token.line);
                                 }
 
                                 if self.result.properties.character_describe.is_none() {
-                                    self.result.properties.character_describe = Some(HashMap::new());
+                                    self.result.properties.character_describe =
+                                        Some(HashMap::new());
                                 }
 
-                                if let Some(char_describe) = &mut self.result.properties.character_describe {
+                                if let Some(char_describe) =
+                                    &mut self.result.properties.character_describe
+                                {
                                     char_describe.insert(character.clone(), text.to_string());
                                 }
                             }
@@ -1738,7 +2074,8 @@ impl FountainParser {
                         last_character_index = self.result.tokens.len();
 
                         // 对话角色加入结构树
-                        if let Some(last_scen_structure_token) = &mut self.last_scen_structure_token {
+                        if let Some(last_scen_structure_token) = &mut self.last_scen_structure_token
+                        {
                             if cfg.dialogue_foldable {
                                 let cobj = StructToken {
                                     text: text_valid.clone(),
@@ -1749,13 +2086,27 @@ impl FountainParser {
                                     notes: Vec::new(),
                                     isscene: false,
                                     ischartor: true,
-                                    dialogue_end_line: if self.lines_length > 0 { self.lines_length - 1 } else { 0 },
+                                    dialogue_end_line: if self.lines_length > 0 {
+                                        self.lines_length - 1
+                                    } else {
+                                        0
+                                    },
                                     duration_sec: 0.0,
                                     range: Some(Range {
-                                        start: Position { line: this_token.line, character: 0 },
-                                        end: Position { line: this_token.line, character: text_valid.len() },
+                                        start: Position {
+                                            line: this_token.line,
+                                            character: 0,
+                                        },
+                                        end: Position {
+                                            line: this_token.line,
+                                            character: text_valid.len(),
+                                        },
                                     }),
-                                    id: Some(format!("{}/{}", last_scen_structure_token.id.clone().unwrap_or_default(), this_token.line)),
+                                    id: Some(format!(
+                                        "{}/{}",
+                                        last_scen_structure_token.id.clone().unwrap_or_default(),
+                                        this_token.line
+                                    )),
                                     isnote: false,
                                     play_sec: 0.0,
                                     structs: Vec::new(),
@@ -1768,8 +2119,11 @@ impl FountainParser {
                         }
 
                         // 处理角色名格式
-                        self.text_display = Regex::new(r"^(.*?↻)?[ \t]*@").unwrap()
-                            .replace(&self.text_display, "").trim().to_string();
+                        self.text_display = Regex::new(r"^(.*?↻)?[ \t]*@")
+                            .unwrap()
+                            .replace(&self.text_display, "")
+                            .trim()
+                            .to_string();
                         this_token.text = self.text_display.clone();
 
                         if cfg.print_dialogue_numbers {
@@ -1778,7 +2132,11 @@ impl FountainParser {
 
                         self.push_token(this_token);
                         continue;
-                    } else if BLOCK_REGEX.get("action_force").unwrap().is_match(&self.text_valid) {
+                    } else if BLOCK_REGEX
+                        .get("action_force")
+                        .unwrap()
+                        .is_match(&self.text_valid)
+                    {
                         // 处理强制动作
                         self.process_title_page_end(i);
                         this_token.token_type = "action".to_string();
@@ -1798,7 +2156,7 @@ impl FountainParser {
 
                         self.push_token(this_token);
                         continue;
-                    }  else {
+                    } else {
                         action = true;
                     }
                 } else {
@@ -1806,13 +2164,20 @@ impl FountainParser {
                 }
 
                 if action {
-                    if self.regex.get("centered").unwrap().is_match(&self.text_valid) {
+                    if self
+                        .regex
+                        .get("centered")
+                        .unwrap()
+                        .is_match(&self.text_valid)
+                    {
                         // 处理居中文本
                         self.process_title_page_end(i);
                         this_token.token_type = "centered".to_string();
 
-                        let mt = Regex::new(r"((?:^.*?↻)|^)[ \t]*>\s*(.+)\s*?<\s*((?:இ.*$)|(?:↺.*$)|$)").unwrap()
-                            .captures(&self.text_display);
+                        let mt =
+                            Regex::new(r"((?:^.*?↻)|^)[ \t]*>\s*(.+)\s*?<\s*((?:இ.*$)|(?:↺.*$)|$)")
+                                .unwrap()
+                                .captures(&self.text_display);
 
                         if let Some(captures) = mt {
                             let group1 = captures.get(1).map_or("", |m| m.as_str()).trim();
@@ -1825,12 +2190,18 @@ impl FountainParser {
 
                         self.push_token(this_token);
                         continue;
-                    }else if self.regex.get("section").unwrap().is_match(&self.text_valid) {
+                    } else if self
+                        .regex
+                        .get("section")
+                        .unwrap()
+                        .is_match(&self.text_valid)
+                    {
                         // 处理章节标题
                         self.process_title_page_end(i);
                         this_token.token_type = "section".to_string();
 
-                        let mt = Regex::new(r"^((?:.*?↻)?\s*)(#+)(?:\s*)(.*)").unwrap()
+                        let mt = Regex::new(r"^((?:.*?↻)?\s*)(#+)(?:\s*)(.*)")
+                            .unwrap()
                             .captures(&self.text_display);
 
                         if let Some(captures) = mt {
@@ -1842,7 +2213,10 @@ impl FountainParser {
                             this_token.text = format!("{}{}", group1, group3);
                             process_token_text_style_char(&mut this_token);
 
-                            println!("【parse】section: {}, level: {:?}", this_token.text, this_token.level);
+                            println!(
+                                "【parse】section: {}, level: {:?}",
+                                this_token.text, this_token.level
+                            );
 
                             // 创建结构树节点
                             let mut cobj = StructToken {
@@ -1857,8 +2231,14 @@ impl FountainParser {
                                 dialogue_end_line: 0,
                                 duration_sec: 0.0,
                                 range: Some(Range {
-                                    start: Position { line: this_token.line, character: 0 },
-                                    end: Position { line: this_token.line, character: self.text_valid.len() },
+                                    start: Position {
+                                        line: this_token.line,
+                                        character: 0,
+                                    },
+                                    end: Position {
+                                        line: this_token.line,
+                                        character: self.text_valid.len(),
+                                    },
                                 }),
                                 id: None,
                                 isnote: false,
@@ -1874,7 +2254,11 @@ impl FountainParser {
                                 self.result.properties.structure.push(cobj);
                             } else {
                                 if let Some(level) = self.latest_section(self.current_depth - 1) {
-                                    cobj.id = Some(format!("{}/{}", level.id.as_ref().unwrap_or(&String::new()), this_token.line));
+                                    cobj.id = Some(format!(
+                                        "{}/{}",
+                                        level.id.as_ref().unwrap_or(&String::new()),
+                                        this_token.line
+                                    ));
 
                                     // 找到父节点并添加子节点
                                     for parent in &mut self.result.properties.structure {
@@ -1892,7 +2276,12 @@ impl FountainParser {
 
                         self.push_token(this_token);
                         continue;
-                    } else if self.regex.get("page_break").unwrap().is_match(&self.text_valid) {
+                    } else if self
+                        .regex
+                        .get("page_break")
+                        .unwrap()
+                        .is_match(&self.text_valid)
+                    {
                         // 处理分页符（必须在synopsis之前检查，因为===也会匹配synopsis的正则）
                         self.process_title_page_end(i);
                         this_token.token_type = "page_break".to_string();
@@ -1900,12 +2289,18 @@ impl FountainParser {
 
                         self.push_token(this_token);
                         continue;
-                    } else if self.regex.get("synopsis").unwrap().is_match(&self.text_valid) {
+                    } else if self
+                        .regex
+                        .get("synopsis")
+                        .unwrap()
+                        .is_match(&self.text_valid)
+                    {
                         // 处理概要
                         self.process_title_page_end(i);
                         this_token.token_type = "synopsis".to_string();
 
-                        let mt = Regex::new(r"^((?:.*?↻)?\s*)(?:\=)(.*)").unwrap()
+                        let mt = Regex::new(r"^((?:.*?↻)?\s*)(?:\=)(.*)")
+                            .unwrap()
                             .captures(&self.text_display);
 
                         if let Some(captures) = mt {
@@ -1944,7 +2339,8 @@ impl FountainParser {
                         self.process_title_page_end(i);
                         this_token.token_type = "lyric".to_string();
 
-                        let mt = Regex::new(r"^((?:.*?↻)?\s*)(\~)(\s*)(.*)").unwrap()
+                        let mt = Regex::new(r"^((?:.*?↻)?\s*)(\~)(\s*)(.*)")
+                            .unwrap()
                             .captures(&self.text_display);
 
                         if let Some(captures) = mt {
@@ -1952,7 +2348,8 @@ impl FountainParser {
                             let group3 = captures.get(3).map_or("", |m| m.as_str());
                             let group4 = captures.get(4).map_or("", |m| m.as_str());
 
-                            this_token.text = format!("{}{}{}", group1, group3, group4);
+                            // 为括号内容添加包装符号（与Flutter版本保持一致）
+                            this_token.text = format!("{}{}{}{}{}", group1,FountainConstants::style_chars()["italic_global_begin"], group3, group4,FountainConstants::style_chars()["italic_global_end"]);
                             process_token_text_style_char(&mut this_token);
                         }
 
@@ -1971,12 +2368,6 @@ impl FountainParser {
                 }
             }
 
-
-
-
-
-
-
             // 如果没有匹配任何特定类型，默认为动作
             if this_token.token_type.is_empty() {
                 // 如果仍在标题页状态，跳过默认处理
@@ -1993,7 +2384,8 @@ impl FountainParser {
             last_was_separator = false;
 
             if self.result.state != "ignore" {
-                if this_token.token_type == "scene_heading" || this_token.token_type == "transition" {
+                if this_token.token_type == "scene_heading" || this_token.token_type == "transition"
+                {
                     this_token.text = this_token.text.to_uppercase();
                 }
 
@@ -2032,7 +2424,8 @@ impl FountainParser {
 
         // 处理镜头交切的场景，将场景时间平均分配调整一下
         for shot_cut_token in &mut self.shot_cut_strct_tokens {
-            let duration = shot_cut_token.get("duration")
+            let duration = shot_cut_token
+                .get("duration")
                 .and_then(|v| v.as_f64())
                 .unwrap_or(0.0);
 
@@ -2045,11 +2438,15 @@ impl FountainParser {
                     let average_duration = duration / structs_array.len() as f64;
                     for struct_token in structs_array {
                         if let Some(token) = struct_token.as_object_mut() {
-                            let current_duration = token.get("durationSec")
+                            let current_duration = token
+                                .get("durationSec")
                                 .and_then(|v| v.as_f64())
                                 .unwrap_or(0.0);
 
-                            token.insert("durationSec".to_string(), serde_json::to_value(current_duration + average_duration).unwrap());
+                            token.insert(
+                                "durationSec".to_string(),
+                                serde_json::to_value(current_duration + average_duration).unwrap(),
+                            );
                         }
                     }
                 }
@@ -2070,7 +2467,8 @@ impl FountainParser {
                     let mut char_map: HashMap<String, Vec<usize>> = HashMap::new(); // 角色，在行中字符index的start和end
 
                     // 先将result.properties.characters按照角色名的长度排序，长的在前面
-                    let mut sorted_keys: Vec<String> = self.result.properties.characters.keys().cloned().collect();
+                    let mut sorted_keys: Vec<String> =
+                        self.result.properties.characters.keys().cloned().collect();
                     sorted_keys.sort_by(|a, b| b.len().cmp(&a.len()));
 
                     for k in sorted_keys {
@@ -2153,8 +2551,13 @@ impl FountainParser {
 
         // 生成HTML输出
         if generate_html {
-            self.result.script_html = Some(crate::parser::text_processor::generate_html(&self.result.tokens));
-            self.result.title_html = Some(crate::parser::text_processor::generate_title_html(&self.result.properties.title_keys, &self.result.tokens));
+            self.result.script_html = Some(crate::parser::text_processor::generate_html(
+                &self.result.tokens,
+            ));
+            self.result.title_html = Some(crate::parser::text_processor::generate_title_html(
+                &self.result.properties.title_keys,
+                &self.result.tokens,
+            ));
         }
 
         // 计算解析时间
@@ -2176,11 +2579,11 @@ impl FountainParser {
         );
         self.regex.insert(
             "section".to_string(),
-            Regex::new(r"^[ \t]*(#+)(?:\s*)(.*)").unwrap()
+            Regex::new(r"^[ \t]*(#+)(?:\s*)(.*)").unwrap(),
         );
         self.regex.insert(
             "synopsis".to_string(),
-            Regex::new(r"^[ \t]*(?:\=)(.*)").unwrap()
+            Regex::new(r"^[ \t]*(?:\=)(.*)").unwrap(),
         );
         self.regex.insert(
             "scene_heading".to_string(),
@@ -2188,113 +2591,268 @@ impl FountainParser {
         );
         self.regex.insert(
             "scene_number".to_string(),
-            Regex::new(r"#\s*(?:\$\{\s*([^\}\s]*)\s*\})?\s*([^#]*)\s*#").unwrap()
+            Regex::new(r"#\s*(?:\$\{\s*([^\}\s]*)\s*\})?\s*([^#]*)\s*#").unwrap(),
         );
         self.regex.insert(
             "transition".to_string(),
-            Regex::new(r"^\s*(?:(>)[^\n\r<]*|[A-Z ]+TO:)$").unwrap()
+            Regex::new(r"^\s*(?:(>)[^\n\r<]*|[A-Z ]+TO:)$").unwrap(),
         );
         self.regex.insert(
             "character".to_string(),
-            Regex::new(r"^[ \t]*((\p{Lu}[^\p{Ll}\r\n@]*)|(@[^\r\n\(（\^]*))(\(.*\)|（.*）)?(\s*\^)?\s*$").unwrap()
+            Regex::new(
+                r"^[ \t]*((\p{Lu}[^\p{Ll}\r\n@]*)|(@[^\r\n\(（\^]*))(\(.*\)|（.*）)?(\s*\^)?\s*$",
+            )
+            .unwrap(),
         );
         self.regex.insert(
             "parenthetical".to_string(),
-            Regex::new(r"^[ \t]*(\(.+\)|（.+）)\s*$").unwrap()
+            Regex::new(r"^[ \t]*(\(.+\)|（.+）)\s*$").unwrap(),
         );
         self.regex.insert(
             "parenthetical_start".to_string(),
-            Regex::new(r"^[ \t]*(?:\(|（)[^\)）]*$").unwrap()
+            Regex::new(r"^[ \t]*(?:\(|（)[^\)）]*$").unwrap(),
         );
         self.regex.insert(
             "parenthetical_end".to_string(),
-            Regex::new(r"^.*(?:\)|）)\s*$").unwrap()
+            Regex::new(r"^.*(?:\)|）)\s*$").unwrap(),
         );
-        self.regex.insert(
-            "action".to_string(),
-            Regex::new(r"^(.+)").unwrap()
-        );
+        self.regex
+            .insert("action".to_string(), Regex::new(r"^(.+)").unwrap());
         self.regex.insert(
             "centered".to_string(),
-            Regex::new(r"^[ \t]*>\s*(.+)\s*<\s*$").unwrap()
+            Regex::new(r"^[ \t]*>\s*(.+)\s*<\s*$").unwrap(),
         );
         self.regex.insert(
             "page_break".to_string(),
-            Regex::new(r"^\s*\={3,}\s*$").unwrap()
+            Regex::new(r"^\s*\={3,}\s*$").unwrap(),
         );
-        self.regex.insert(
-            "line_break".to_string(),
-            Regex::new(r"^ {2,}$").unwrap()
-        );
+        self.regex
+            .insert("line_break".to_string(), Regex::new(r"^ {2,}$").unwrap());
         self.regex.insert(
             "note_inline".to_string(),
-            Regex::new(r"\[{2}([^\[].+?)\]{2}").unwrap()
+            Regex::new(r"\[{2}([^\[].+?)\]{2}").unwrap(),
         );
         self.regex.insert(
             "emphasis".to_string(),
-            Regex::new(r"(_|\*{1,3}|_\*{1,3}|\*{1,3}_)(.+)(_|\*{1,3}|_\*{1,3}|\*{1,3}_)").unwrap()
+            Regex::new(r"(_|\*{1,3}|_\*{1,3}|\*{1,3}_)(.+)(_|\*{1,3}|_\*{1,3}|\*{1,3}_)").unwrap(),
         );
         self.regex.insert(
             "bold_italic_underline".to_string(),
-            Regex::new(r"(_{1}\*{3}|\*{3}_{1})(.+?)(\*{3}_{1}|_{1}\*{3})").unwrap()
+            Regex::new(r"(_{1}\*{3}|\*{3}_{1})(.+?)(\*{3}_{1}|_{1}\*{3})").unwrap(),
         );
         self.regex.insert(
             "bold_underline".to_string(),
-            Regex::new(r"(_{1}\*{2}|\*{2}_{1})(.+?)(\*{2}_{1}|_{1}\*{2})").unwrap()
+            Regex::new(r"(_{1}\*{2}|\*{2}_{1})(.+?)(\*{2}_{1}|_{1}\*{2})").unwrap(),
         );
         self.regex.insert(
             "italic_underline".to_string(),
-            Regex::new(r"(_{1}\*{1}|\*{1}_{1})(.+?)(\*{1}_{1}|_{1}\*{1})").unwrap()
+            Regex::new(r"(_{1}\*{1}|\*{1}_{1})(.+?)(\*{1}_{1}|_{1}\*{1})").unwrap(),
         );
         self.regex.insert(
             "bold_italic".to_string(),
-            Regex::new(r"(\*{3})(.+?)(\*{3})").unwrap()
+            Regex::new(r"(\*{3})(.+?)(\*{3})").unwrap(),
         );
         self.regex.insert(
             "bold".to_string(),
-            Regex::new(r"(\*{2})(.+?)(\*{2})").unwrap()
+            Regex::new(r"(\*{2})(.+?)(\*{2})").unwrap(),
         );
         self.regex.insert(
             "italic".to_string(),
-            Regex::new(r"(\*{1})(.+?)(\*{1})").unwrap()
+            Regex::new(r"(\*{1})(.+?)(\*{1})").unwrap(),
         );
         self.regex.insert(
             "underline".to_string(),
-            Regex::new(r"(_{1})(.+?)(_{1})").unwrap()
+            Regex::new(r"(_{1})(.+?)(_{1})").unwrap(),
         );
     }
 
     // 初始化标题页显示配置
     fn init_title_page_display(&mut self) {
-        self.title_page_display.insert("title".to_string(), TitleKeywordFormat { position: "cc".to_string(), index: 0 });
-        self.title_page_display.insert("credit".to_string(), TitleKeywordFormat { position: "cc".to_string(), index: 1 });
-        self.title_page_display.insert("author".to_string(), TitleKeywordFormat { position: "cc".to_string(), index: 2 });
-        self.title_page_display.insert("authors".to_string(), TitleKeywordFormat { position: "cc".to_string(), index: 3 });
-        self.title_page_display.insert("source".to_string(), TitleKeywordFormat { position: "cc".to_string(), index: 4 });
+        self.title_page_display.insert(
+            "title".to_string(),
+            TitleKeywordFormat {
+                position: "cc".to_string(),
+                index: 0,
+            },
+        );
+        self.title_page_display.insert(
+            "credit".to_string(),
+            TitleKeywordFormat {
+                position: "cc".to_string(),
+                index: 1,
+            },
+        );
+        self.title_page_display.insert(
+            "author".to_string(),
+            TitleKeywordFormat {
+                position: "cc".to_string(),
+                index: 2,
+            },
+        );
+        self.title_page_display.insert(
+            "authors".to_string(),
+            TitleKeywordFormat {
+                position: "cc".to_string(),
+                index: 3,
+            },
+        );
+        self.title_page_display.insert(
+            "source".to_string(),
+            TitleKeywordFormat {
+                position: "cc".to_string(),
+                index: 4,
+            },
+        );
 
-        self.title_page_display.insert("watermark".to_string(), TitleKeywordFormat { position: "hidden".to_string(), index: -1 });
-        self.title_page_display.insert("font".to_string(), TitleKeywordFormat { position: "hidden".to_string(), index: -1 });
-        self.title_page_display.insert("font_italic".to_string(), TitleKeywordFormat { position: "hidden".to_string(), index: -1 });
-        self.title_page_display.insert("font_bold".to_string(), TitleKeywordFormat { position: "hidden".to_string(), index: -1 });
-        self.title_page_display.insert("font_bold_italic".to_string(), TitleKeywordFormat { position: "hidden".to_string(), index: -1 });
-        self.title_page_display.insert("header".to_string(), TitleKeywordFormat { position: "hidden".to_string(), index: -1 });
-        self.title_page_display.insert("footer".to_string(), TitleKeywordFormat { position: "hidden".to_string(), index: -1 });
-        self.title_page_display.insert("metadata".to_string(), TitleKeywordFormat { position: "hidden".to_string(), index: -1 });
+        self.title_page_display.insert(
+            "watermark".to_string(),
+            TitleKeywordFormat {
+                position: "hidden".to_string(),
+                index: -1,
+            },
+        );
+        self.title_page_display.insert(
+            "font".to_string(),
+            TitleKeywordFormat {
+                position: "hidden".to_string(),
+                index: -1,
+            },
+        );
+        self.title_page_display.insert(
+            "font_italic".to_string(),
+            TitleKeywordFormat {
+                position: "hidden".to_string(),
+                index: -1,
+            },
+        );
+        self.title_page_display.insert(
+            "font_bold".to_string(),
+            TitleKeywordFormat {
+                position: "hidden".to_string(),
+                index: -1,
+            },
+        );
+        self.title_page_display.insert(
+            "font_bold_italic".to_string(),
+            TitleKeywordFormat {
+                position: "hidden".to_string(),
+                index: -1,
+            },
+        );
+        self.title_page_display.insert(
+            "header".to_string(),
+            TitleKeywordFormat {
+                position: "hidden".to_string(),
+                index: -1,
+            },
+        );
+        self.title_page_display.insert(
+            "footer".to_string(),
+            TitleKeywordFormat {
+                position: "hidden".to_string(),
+                index: -1,
+            },
+        );
+        self.title_page_display.insert(
+            "metadata".to_string(),
+            TitleKeywordFormat {
+                position: "hidden".to_string(),
+                index: -1,
+            },
+        );
 
-        self.title_page_display.insert("notes".to_string(), TitleKeywordFormat { position: "bl".to_string(), index: 0 });
-        self.title_page_display.insert("copyright".to_string(), TitleKeywordFormat { position: "bl".to_string(), index: 1 });
+        self.title_page_display.insert(
+            "notes".to_string(),
+            TitleKeywordFormat {
+                position: "bl".to_string(),
+                index: 0,
+            },
+        );
+        self.title_page_display.insert(
+            "copyright".to_string(),
+            TitleKeywordFormat {
+                position: "bl".to_string(),
+                index: 1,
+            },
+        );
 
-        self.title_page_display.insert("revision".to_string(), TitleKeywordFormat { position: "br".to_string(), index: 0 });
-        self.title_page_display.insert("date".to_string(), TitleKeywordFormat { position: "br".to_string(), index: 1 });
-        self.title_page_display.insert("draft_date".to_string(), TitleKeywordFormat { position: "br".to_string(), index: 2 });
-        self.title_page_display.insert("contact".to_string(), TitleKeywordFormat { position: "br".to_string(), index: 3 });
-        self.title_page_display.insert("contact_info".to_string(), TitleKeywordFormat { position: "br".to_string(), index: 4 });
+        self.title_page_display.insert(
+            "revision".to_string(),
+            TitleKeywordFormat {
+                position: "br".to_string(),
+                index: 0,
+            },
+        );
+        self.title_page_display.insert(
+            "date".to_string(),
+            TitleKeywordFormat {
+                position: "br".to_string(),
+                index: 1,
+            },
+        );
+        self.title_page_display.insert(
+            "draft_date".to_string(),
+            TitleKeywordFormat {
+                position: "br".to_string(),
+                index: 2,
+            },
+        );
+        self.title_page_display.insert(
+            "contact".to_string(),
+            TitleKeywordFormat {
+                position: "br".to_string(),
+                index: 3,
+            },
+        );
+        self.title_page_display.insert(
+            "contact_info".to_string(),
+            TitleKeywordFormat {
+                position: "br".to_string(),
+                index: 4,
+            },
+        );
 
-        self.title_page_display.insert("br".to_string(), TitleKeywordFormat { position: "br".to_string(), index: -1 });
-        self.title_page_display.insert("bl".to_string(), TitleKeywordFormat { position: "bl".to_string(), index: -1 });
-        self.title_page_display.insert("tr".to_string(), TitleKeywordFormat { position: "tr".to_string(), index: -1 });
-        self.title_page_display.insert("tc".to_string(), TitleKeywordFormat { position: "tc".to_string(), index: -1 });
-        self.title_page_display.insert("tl".to_string(), TitleKeywordFormat { position: "tl".to_string(), index: -1 });
-        self.title_page_display.insert("cc".to_string(), TitleKeywordFormat { position: "cc".to_string(), index: -1 });
+        self.title_page_display.insert(
+            "br".to_string(),
+            TitleKeywordFormat {
+                position: "br".to_string(),
+                index: -1,
+            },
+        );
+        self.title_page_display.insert(
+            "bl".to_string(),
+            TitleKeywordFormat {
+                position: "bl".to_string(),
+                index: -1,
+            },
+        );
+        self.title_page_display.insert(
+            "tr".to_string(),
+            TitleKeywordFormat {
+                position: "tr".to_string(),
+                index: -1,
+            },
+        );
+        self.title_page_display.insert(
+            "tc".to_string(),
+            TitleKeywordFormat {
+                position: "tc".to_string(),
+                index: -1,
+            },
+        );
+        self.title_page_display.insert(
+            "tl".to_string(),
+            TitleKeywordFormat {
+                position: "tl".to_string(),
+                index: -1,
+            },
+        );
+        self.title_page_display.insert(
+            "cc".to_string(),
+            TitleKeywordFormat {
+                position: "cc".to_string(),
+                index: -1,
+            },
+        );
     }
 }

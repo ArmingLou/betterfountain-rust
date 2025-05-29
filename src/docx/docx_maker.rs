@@ -1047,7 +1047,7 @@ impl DocxContext {
         let current_count = CALL_COUNT.fetch_add(1, Ordering::SeqCst);
 
         // 只打印前30次调用的信息
-        let should_print = current_count < 30;
+        let _should_print = current_count < 30;
 
         // 调试：打印脚注状态
         // if should_print && (self.current_note.page_idx > -1 || text.contains("↺") || text.contains("↻") || text.contains("இ") || text.contains("晚霞") || text.contains("序言")) {
@@ -1155,7 +1155,7 @@ impl DocxContext {
             url: String,
         }
 
-        let mut links: Vec<Link> = Vec::new();
+        let links: Vec<Link> = Vec::new();
 
         // 处理链接
         if let Some(links_option) = options.get("links") {
@@ -1475,7 +1475,7 @@ impl DocxContext {
                         // 当收集脚注时，创建真正的脚注引用
 
                         // 将脚注文本转换为格式化的TextRun
-                        let mut footnote_runs = Vec::new();
+                        let footnote_runs = Vec::new();
 
                         let footnote_ref = crate::docx::adapter::docx::TextRun::footnote_reference(
                             self.notes_len,
@@ -1793,6 +1793,274 @@ fn inline(text: &str) -> String {
     result.trim().to_string()
 }
 
+/// 页面尺寸计算结果
+#[derive(Debug, Clone)]
+struct PageDimensions {
+    page_width: i32,
+    page_height: i32,
+    left_margin: i32,
+    right_margin: i32,
+    top_margin: i32,
+    bottom_margin: i32,
+    line_height: i32,
+    inner_width: i32,
+}
+
+/// 计算页面尺寸和边距
+fn calculate_page_dimensions(print: &PrintProfile, line_height: f32) -> PageDimensions {
+    let page_width = convert_inches_to_twip(print.page_width);
+    let page_height = convert_inches_to_twip(print.page_height);
+    let left_margin = convert_inches_to_twip(print.left_margin);
+    let right_margin = convert_inches_to_twip(print.right_margin);
+    let top_margin = convert_inches_to_twip(print.top_margin);
+    let bottom_margin = convert_inches_to_twip(print.bottom_margin);
+    let line_h = convert_inches_to_twip(line_height);
+    let inner_width = page_width - left_margin - right_margin;
+
+    PageDimensions {
+        page_width,
+        page_height,
+        left_margin,
+        right_margin,
+        top_margin,
+        bottom_margin,
+        line_height: line_h,
+        inner_width,
+    }
+}
+
+/// 创建标题页框架配置
+fn create_title_frame(
+    position: &str,
+    dimensions: &PageDimensions,
+) -> crate::docx::adapter::ParagraphFrame {
+    match position {
+        "tl" => crate::docx::adapter::ParagraphFrame {
+            width: Some(dimensions.inner_width / 3),
+            height: Some(0),
+            anchor_horizontal: Some(crate::docx::adapter::FrameAnchorType::Margin),
+            anchor_vertical: Some(crate::docx::adapter::FrameAnchorType::Margin),
+            x_align: Some(crate::docx::adapter::HorizontalPositionAlign::Left),
+            y_align: Some(crate::docx::adapter::VerticalPositionAlign::Top),
+            page_height: Some(dimensions.page_height),
+            top_margin: Some(dimensions.top_margin),
+            bottom_margin: Some(dimensions.bottom_margin),
+            line_height: Some(dimensions.line_height),
+        },
+        "tc" => crate::docx::adapter::ParagraphFrame {
+            width: Some(dimensions.inner_width / 3),
+            height: Some(0),
+            anchor_horizontal: Some(crate::docx::adapter::FrameAnchorType::Margin),
+            anchor_vertical: Some(crate::docx::adapter::FrameAnchorType::Margin),
+            x_align: Some(crate::docx::adapter::HorizontalPositionAlign::Center),
+            y_align: Some(crate::docx::adapter::VerticalPositionAlign::Top),
+            page_height: Some(dimensions.page_height),
+            top_margin: Some(dimensions.top_margin),
+            bottom_margin: Some(dimensions.bottom_margin),
+            line_height: Some(dimensions.line_height),
+        },
+        "tr" => crate::docx::adapter::ParagraphFrame {
+            width: Some(dimensions.inner_width / 3),
+            height: Some(0),
+            anchor_horizontal: Some(crate::docx::adapter::FrameAnchorType::Margin),
+            anchor_vertical: Some(crate::docx::adapter::FrameAnchorType::Margin),
+            x_align: Some(crate::docx::adapter::HorizontalPositionAlign::Right),
+            y_align: Some(crate::docx::adapter::VerticalPositionAlign::Top),
+            page_height: Some(dimensions.page_height),
+            top_margin: Some(dimensions.top_margin),
+            bottom_margin: Some(dimensions.bottom_margin),
+            line_height: Some(dimensions.line_height),
+        },
+        "cc" => crate::docx::adapter::ParagraphFrame {
+            width: Some(dimensions.inner_width),
+            height: Some(0),
+            anchor_horizontal: Some(crate::docx::adapter::FrameAnchorType::Margin),
+            anchor_vertical: Some(crate::docx::adapter::FrameAnchorType::Margin),
+            x_align: Some(crate::docx::adapter::HorizontalPositionAlign::Center),
+            y_align: Some(crate::docx::adapter::VerticalPositionAlign::Center),
+            page_height: Some(dimensions.page_height),
+            top_margin: Some(dimensions.top_margin),
+            bottom_margin: Some(dimensions.bottom_margin),
+            line_height: Some(dimensions.line_height),
+        },
+        "bl" => crate::docx::adapter::ParagraphFrame {
+            width: Some(dimensions.inner_width / 2),
+            height: Some(0),
+            anchor_horizontal: Some(crate::docx::adapter::FrameAnchorType::Page),
+            anchor_vertical: Some(crate::docx::adapter::FrameAnchorType::Page),
+            x_align: Some(crate::docx::adapter::HorizontalPositionAlign::Left),
+            y_align: Some(crate::docx::adapter::VerticalPositionAlign::Bottom),
+            page_height: Some(dimensions.page_height),
+            top_margin: Some(dimensions.top_margin),
+            bottom_margin: Some(dimensions.bottom_margin),
+            line_height: Some(dimensions.line_height),
+        },
+        "br" => crate::docx::adapter::ParagraphFrame {
+            width: Some(dimensions.inner_width / 2),
+            height: Some(0),
+            anchor_horizontal: Some(crate::docx::adapter::FrameAnchorType::Page),
+            anchor_vertical: Some(crate::docx::adapter::FrameAnchorType::Page),
+            x_align: Some(crate::docx::adapter::HorizontalPositionAlign::Right),
+            y_align: Some(crate::docx::adapter::VerticalPositionAlign::Bottom),
+            page_height: Some(dimensions.page_height),
+            top_margin: Some(dimensions.top_margin),
+            bottom_margin: Some(dimensions.bottom_margin),
+            line_height: Some(dimensions.line_height),
+        },
+        _ => crate::docx::adapter::ParagraphFrame {
+            width: Some(dimensions.inner_width),
+            height: Some(0),
+            anchor_horizontal: Some(crate::docx::adapter::FrameAnchorType::Margin),
+            anchor_vertical: Some(crate::docx::adapter::FrameAnchorType::Margin),
+            x_align: Some(crate::docx::adapter::HorizontalPositionAlign::Left),
+            y_align: Some(crate::docx::adapter::VerticalPositionAlign::Top),
+            page_height: Some(dimensions.page_height),
+            top_margin: Some(dimensions.top_margin),
+            bottom_margin: Some(dimensions.bottom_margin),
+            line_height: Some(dimensions.line_height),
+        },
+    }
+}
+
+/// 获取标题页位置的对齐方式
+fn get_title_alignment(position: &str) -> Option<crate::docx::adapter::AlignmentType> {
+    match position {
+        "tc" | "cc" => Some(crate::docx::adapter::AlignmentType::Center),
+        "tr" | "br" => Some(crate::docx::adapter::AlignmentType::Right),
+        _ => None, // 默认左对齐
+    }
+}
+
+/// 创建基础选项映射
+fn create_basic_options_map(color: &str) -> HashMap<String, String> {
+    let mut options_map = HashMap::new();
+    options_map.insert("color".to_string(), color.to_string());
+    options_map
+}
+
+/// 完成中文格式对话和双对话处理的辅助函数
+fn finish_dialogue_processing(
+    doc: &mut DocxContext,
+    china_format: i32,
+    token_type: &str,
+    scene_or_section_or_tran_started: bool,
+    section_main: &mut crate::docx::adapter::docx::Section,
+    section_main_no_page_num: &mut crate::docx::adapter::docx::Section,
+    print: &PrintProfile,
+) {
+    // 完成中文格式对话处理
+    if china_format > 0 {
+        doc.finish_china_dial_first(if scene_or_section_or_tran_started {
+            section_main
+        } else {
+            section_main_no_page_num
+        });
+    }
+
+    // 检查是否需要完成双对话处理
+    let has_right_table_content = !doc.last_dial_table_right.is_empty();
+    let has_left_or_right_cache =
+        doc.last_dial_gr_left.is_some() || doc.last_dial_gr_right.is_some();
+    let has_global_table_content =
+        !doc.last_dial_table_left.is_empty() || !doc.last_dial_table_right.is_empty();
+
+    if has_right_table_content
+        || has_left_or_right_cache
+        || has_global_table_content
+        || token_type != "separator"
+    {
+        doc.finish_double_dial(
+            if scene_or_section_or_tran_started {
+                section_main
+            } else {
+                section_main_no_page_num
+            },
+            print,
+        );
+    }
+}
+
+/// 添加段落到相应section并更新行映射的辅助函数
+fn add_paragraph_and_update_line_map(
+    child: crate::docx::adapter::docx::SectionChild,
+    line: &Line,
+    scene_or_section_or_tran_started: bool,
+    section_main: &mut crate::docx::adapter::docx::Section,
+    section_main_no_page_num: &mut crate::docx::adapter::docx::Section,
+    line_map: &mut Option<&mut HashMap<usize, LineStruct>>,
+    current_sections: &[String],
+    current_scene: &str,
+    current_page: usize,
+    current_duration: f64,
+) {
+    // 添加段落到相应的 section
+    if scene_or_section_or_tran_started {
+        section_main.children.push(
+            child,
+        );
+    } else {
+        section_main_no_page_num.children.push(
+            child,
+        );
+    }
+
+    // 更新行映射
+    if let Some(token_line) = line.token {
+        if let Some(ref mut lm) = line_map {
+            lm.insert(
+                token_line,
+                LineStruct {
+                    sections: current_sections.to_vec(),
+                    scene: current_scene.to_string(),
+                    page: current_page,
+                    cumulative_duration: current_duration as f32,
+                },
+            );
+        }
+    }
+}
+
+/// 创建文本运行并添加到段落的辅助函数
+fn add_text_runs_to_paragraph(
+    doc: &mut DocxContext,
+    paragraph: &mut crate::docx::adapter::docx::Paragraph,
+    text: &str,
+    options_map: &HashMap<String, String>,
+) {
+    let text_runs = doc.text2(text, options_map, None, None);
+    for run in text_runs {
+        paragraph.add_text_run(run);
+    }
+}
+
+/// 处理场景编号的辅助函数
+fn process_scene_number(
+    scene_number: &str,
+    scenes_numbers: &str,
+) -> (String, String) {
+    let scene_text_length = scene_number.chars().count();
+
+    let left_char = if scene_text_length < 3 {
+        3 - scene_text_length
+    } else {
+        0
+    };
+
+    let left_scene_number = if scenes_numbers == "both" || scenes_numbers == "left" {
+        format!("{}{}", " ".repeat(left_char), scene_number)
+    } else {
+        String::new()
+    };
+
+    let right_scene_number = if scenes_numbers == "both" || scenes_numbers == "right" {
+        scene_number.to_string()
+    } else {
+        String::new()
+    };
+
+    (left_scene_number, right_scene_number)
+}
+
 /// 生成文档
 /// 生成 DOCX 文档
 ///
@@ -1921,284 +2189,63 @@ pub fn generate(
             let mut title_section = crate::docx::adapter::docx::Section::new();
             title_section.properties = section_props.clone();
 
+            // 计算页面尺寸（一次性计算，避免重复）
+            let dimensions = calculate_page_dimensions(print, line_height);
+
             // 处理标题页内容（按固定顺序：tl | tc | tr | cc | bl | br）
             for key in ["tl", "tc", "tr", "cc", "bl", "br"] {
                 if let Some(tokens) = parsed.title_page.get(key) {
                     println!(
-                    "【generate】处理标题页元素: {} (包含 {} 个 token)",
-                    key,
-                    tokens.len()
-                );
-                if !tokens.is_empty() {
-                    let mut text = String::new();
+                        "【generate】处理标题页元素: {} (包含 {} 个 token)",
+                        key,
+                        tokens.len()
+                    );
+                    if !tokens.is_empty() {
+                        // 按索引排序并连接文本
+                        let mut sorted_tokens = tokens.clone();
+                        sorted_tokens.sort_by(|a, b| a.index.cmp(&b.index));
 
-                    // 根据不同的位置处理文本
-                    match key {
-                        "tl" | "tc" | "tr" | "bl" | "cc" | "br" => {
-                            // 按索引排序
-                            let mut sorted_tokens = tokens.clone();
-                            sorted_tokens.sort_by(|a, b| a.index.cmp(&b.index));
-
-                            // 连接文本
-                            for token in sorted_tokens {
-                                if !text.is_empty() {
-                                    text.push_str("\n\n");
-                                }
-                                text.push_str(&token.text);
-                            }
-
-                            println!("【generate】标题页元素 {} 文本内容: {}", key, text);
-
-                            // 创建段落
+                        let mut text = String::new();
+                        for token in sorted_tokens {
                             if !text.is_empty() {
-                                // 创建段落
-                                let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
-
-                                // 在各个 case 中获取内宽，用于设置框架宽度
-
-                                // 设置对齐方式和框架属性
-                                match key {
-                                    "tl" => {
-                                        // 左上角
-                                        // 使用默认的左对齐
-
-                                        // 获取页面宽度、高度和边距
-                                        let page_width = convert_inches_to_twip(print.page_width);
-                                        let page_height = convert_inches_to_twip(print.page_height);
-                                        let left_margin = convert_inches_to_twip(print.left_margin);
-                                        let right_margin =
-                                            convert_inches_to_twip(print.right_margin);
-                                        let top_margin = convert_inches_to_twip(print.top_margin);
-                                        let bottom_margin =
-                                            convert_inches_to_twip(print.bottom_margin);
-                                        let line_h = convert_inches_to_twip(line_height);
-
-                                        // 计算内部宽度
-                                        let inner_width = page_width - left_margin - right_margin;
-
-                                        // 使用框架实现左上角对齐
-                                        paragraph.frame(crate::docx::adapter::ParagraphFrame {
-                                            width: Some(inner_width / 3),
-                                            height: Some(0),
-                                            anchor_horizontal: Some(
-                                                crate::docx::adapter::FrameAnchorType::Margin,
-                                            ),
-                                            anchor_vertical: Some(
-                                                crate::docx::adapter::FrameAnchorType::Margin,
-                                            ),
-                                            x_align: Some(
-                                                crate::docx::adapter::HorizontalPositionAlign::Left,
-                                            ),
-                                            y_align: Some(
-                                                crate::docx::adapter::VerticalPositionAlign::Top,
-                                            ),
-                                            page_height: Some(page_height),
-                                            top_margin: Some(top_margin),
-                                            bottom_margin: Some(bottom_margin),
-                                            line_height: Some(line_h),
-                                        });
-                                    }
-                                    "tc" => {
-                                        // 上中
-                                        paragraph
-                                            .align(crate::docx::adapter::AlignmentType::Center);
-
-                                        // 获取页面宽度、高度和边距
-                                        let page_width = convert_inches_to_twip(print.page_width);
-                                        let page_height = convert_inches_to_twip(print.page_height);
-                                        let left_margin = convert_inches_to_twip(print.left_margin);
-                                        let right_margin =
-                                            convert_inches_to_twip(print.right_margin);
-                                        let top_margin = convert_inches_to_twip(print.top_margin);
-                                        let bottom_margin =
-                                            convert_inches_to_twip(print.bottom_margin);
-                                        let line_h = convert_inches_to_twip(line_height);
-
-                                        // 计算内部宽度
-                                        let inner_width = page_width - left_margin - right_margin;
-
-                                        // 使用框架实现上中对齐
-                                        paragraph.frame(crate::docx::adapter::ParagraphFrame {
-                                            width: Some(inner_width / 3),
-                                            height: Some(0),
-                                            anchor_horizontal: Some(crate::docx::adapter::FrameAnchorType::Margin),
-                                            anchor_vertical: Some(crate::docx::adapter::FrameAnchorType::Margin),
-                                            x_align: Some(crate::docx::adapter::HorizontalPositionAlign::Center),
-                                            y_align: Some(crate::docx::adapter::VerticalPositionAlign::Top),
-                                            page_height: Some(page_height),
-                                            top_margin: Some(top_margin),
-                                            bottom_margin: Some(bottom_margin),
-                                            line_height: Some(line_h),
-                                        });
-                                    }
-                                    "tr" => {
-                                        // 右上角
-                                        paragraph.align(crate::docx::adapter::AlignmentType::Right);
-
-                                        // 获取页面宽度、高度和边距
-                                        let page_width = convert_inches_to_twip(print.page_width);
-                                        let page_height = convert_inches_to_twip(print.page_height);
-                                        let left_margin = convert_inches_to_twip(print.left_margin);
-                                        let right_margin =
-                                            convert_inches_to_twip(print.right_margin);
-                                        let top_margin = convert_inches_to_twip(print.top_margin);
-                                        let bottom_margin =
-                                            convert_inches_to_twip(print.bottom_margin);
-                                        let line_h = convert_inches_to_twip(line_height);
-
-                                        // 计算内部宽度
-                                        let inner_width = page_width - left_margin - right_margin;
-
-                                        // 使用框架实现右上角对齐
-                                        paragraph.frame(crate::docx::adapter::ParagraphFrame {
-                                            width: Some(inner_width / 3),
-                                            height: Some(0),
-                                            anchor_horizontal: Some(crate::docx::adapter::FrameAnchorType::Margin),
-                                            anchor_vertical: Some(crate::docx::adapter::FrameAnchorType::Margin),
-                                            x_align: Some(crate::docx::adapter::HorizontalPositionAlign::Right),
-                                            y_align: Some(crate::docx::adapter::VerticalPositionAlign::Top),
-                                            page_height: Some(page_height),
-                                            top_margin: Some(top_margin),
-                                            bottom_margin: Some(bottom_margin),
-                                            line_height: Some(line_h),
-                                        });
-                                    }
-                                    "cc" => {
-                                        // 中心
-                                        paragraph
-                                            .align(crate::docx::adapter::AlignmentType::Center);
-
-                                        // 获取页面宽度、高度和边距
-                                        let page_width = convert_inches_to_twip(print.page_width);
-                                        let page_height = convert_inches_to_twip(print.page_height);
-                                        let left_margin = convert_inches_to_twip(print.left_margin);
-                                        let right_margin =
-                                            convert_inches_to_twip(print.right_margin);
-                                        let top_margin = convert_inches_to_twip(print.top_margin);
-                                        let bottom_margin =
-                                            convert_inches_to_twip(print.bottom_margin);
-                                        let line_h = convert_inches_to_twip(line_height);
-
-                                        // 计算内部宽度
-                                        let inner_width = page_width - left_margin - right_margin;
-
-                                        // 使用框架实现垂直居中
-                                        paragraph.frame(crate::docx::adapter::ParagraphFrame {
-                                            width: Some(inner_width),
-                                            height: Some(0),
-                                            anchor_horizontal: Some(crate::docx::adapter::FrameAnchorType::Margin),
-                                            anchor_vertical: Some(crate::docx::adapter::FrameAnchorType::Margin),
-                                            x_align: Some(crate::docx::adapter::HorizontalPositionAlign::Center),
-                                            y_align: Some(crate::docx::adapter::VerticalPositionAlign::Center),
-                                            page_height: Some(page_height),
-                                            top_margin: Some(top_margin),
-                                            bottom_margin: Some(bottom_margin),
-                                            line_height: Some(line_h), // 设置行高为1000 twip
-                                        });
-                                    }
-                                    "bl" => {
-                                        // 左下角
-                                        // 使用默认的左对齐
-
-                                        // 获取页面宽度、高度和边距
-                                        let page_width = convert_inches_to_twip(print.page_width);
-                                        let page_height = convert_inches_to_twip(print.page_height);
-                                        let left_margin = convert_inches_to_twip(print.left_margin);
-                                        let right_margin =
-                                            convert_inches_to_twip(print.right_margin);
-                                        let top_margin = convert_inches_to_twip(print.top_margin);
-                                        let bottom_margin =
-                                            convert_inches_to_twip(print.bottom_margin);
-                                        let line_h = convert_inches_to_twip(line_height);
-
-                                        // 计算内部宽度和高度
-                                        let inner_width = page_width - left_margin - right_margin;
-
-                                        // 使用绝对定位实现底部对齐
-                                        // 使用绝对定位，将段落放在页面底部
-                                        paragraph.frame(crate::docx::adapter::ParagraphFrame {
-                                            width: Some(inner_width / 2),
-                                            height: Some(0), // 设置高度为0，让文本自然对齐
-                                            anchor_horizontal: Some(
-                                                crate::docx::adapter::FrameAnchorType::Page,
-                                            ),
-                                            anchor_vertical: Some(
-                                                crate::docx::adapter::FrameAnchorType::Page,
-                                            ),
-                                            x_align: Some(
-                                                crate::docx::adapter::HorizontalPositionAlign::Left,
-                                            ),
-                                            y_align: Some(
-                                                crate::docx::adapter::VerticalPositionAlign::Bottom,
-                                            ),
-                                            page_height: Some(page_height),
-                                            top_margin: Some(top_margin),
-                                            bottom_margin: Some(bottom_margin),
-                                            line_height: Some(line_h),
-                                        });
-                                    }
-                                    "br" => {
-                                        // 右下角
-                                        paragraph.align(crate::docx::adapter::AlignmentType::Right);
-
-                                        // 获取页面宽度、高度和边距
-                                        let page_width = convert_inches_to_twip(print.page_width);
-                                        let page_height = convert_inches_to_twip(print.page_height);
-                                        let left_margin = convert_inches_to_twip(print.left_margin);
-                                        let right_margin =
-                                            convert_inches_to_twip(print.right_margin);
-                                        let top_margin = convert_inches_to_twip(print.top_margin);
-                                        let bottom_margin =
-                                            convert_inches_to_twip(print.bottom_margin);
-                                        let line_h = convert_inches_to_twip(line_height);
-
-                                        // 计算内部宽度
-                                        let inner_width = page_width - left_margin - right_margin;
-
-                                        // 使用绝对定位实现底部对齐
-                                        // 使用绝对定位，将段落放在页面底部
-                                        paragraph.frame(crate::docx::adapter::ParagraphFrame {
-                                            width: Some(inner_width / 2),
-                                            height: Some(0), // 设置高度为0，让文本自然对齐
-                                            anchor_horizontal: Some(crate::docx::adapter::FrameAnchorType::Page),
-                                            anchor_vertical: Some(crate::docx::adapter::FrameAnchorType::Page),
-                                            x_align: Some(crate::docx::adapter::HorizontalPositionAlign::Right),
-                                            y_align: Some(crate::docx::adapter::VerticalPositionAlign::Bottom),
-                                            page_height: Some(page_height),
-                                            top_margin: Some(top_margin),
-                                            bottom_margin: Some(bottom_margin),
-                                            line_height: Some(line_h), // 设置行高
-                                        });
-                                    }
-                                    _ => {}
-                                }
-
-                                // 使用 format_text 函数处理文本格式化
-                                let mut options_map = HashMap::new();
-                                options_map.insert("color".to_string(), "#000000".to_string());
-
-                                let text_runs = doc.text2(&text, &options_map, None, None);
-
-                                // 添加文本运行到段落
-                                for run in text_runs {
-                                    paragraph.add_text_run(run);
-                                }
-
-                                // 添加段落到标题页 section
-                                title_section.children.push(
-                                    crate::docx::adapter::docx::SectionChild::Paragraph(paragraph),
-                                );
-
-                                println!("【generate】已添加标题页元素 {} 到标题页 section", key);
+                                text.push_str("\n\n");
                             }
+                            text.push_str(&token.text);
                         }
-                        _ => {
-                            println!("【generate】跳过标题页元素 {}", key);
+
+                        println!("【generate】标题页元素 {} 文本内容: {}", key, text);
+
+                        // 创建段落
+                        if !text.is_empty() {
+                            let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
+
+                            // 设置对齐方式
+                            if let Some(alignment) = get_title_alignment(key) {
+                                paragraph.align(alignment);
+                            }
+
+                            // 设置框架属性
+                            paragraph.frame(create_title_frame(key, &dimensions));
+
+                            // 处理文本格式化
+                            let options_map = create_basic_options_map("#000000");
+                            let text_runs = doc.text2(&text, &options_map, None, None);
+
+                            // 添加文本运行到段落
+                            for run in text_runs {
+                                paragraph.add_text_run(run);
+                            }
+
+                            // 添加段落到标题页 section
+                            title_section.children.push(
+                                crate::docx::adapter::docx::SectionChild::Paragraph(paragraph),
+                            );
+
+                            println!("【generate】已添加标题页元素 {} 到标题页 section", key);
                         }
                     }
                 }
             }
-        }
             section_title_page = Some(title_section);
         }
         println!("【generate】标题页处理完成");
@@ -2219,6 +2266,9 @@ pub fn generate(
     // 这样适配器层就不会检测到序言页有页眉页脚，从而不会设置全局页眉页脚
     println!("【generate】序言页不设置页眉页脚，确保序言页不显示页码");
 
+    // 预计算常用的选项映射（避免重复创建）
+    let header_footer_options = create_basic_options_map("#777777");
+
     // 创建主要内容 section（有页码）
     let mut section_main = crate::docx::adapter::docx::Section::new();
     section_main.properties = section_props.clone();
@@ -2229,10 +2279,7 @@ pub fn generate(
         header_paragraph.align(crate::docx::adapter::AlignmentType::Center);
 
         // 使用 text2 方法格式化页眉文本，支持特殊字符
-        let mut options_map = HashMap::new();
-        options_map.insert("color".to_string(), "#777777".to_string());
-
-        let header_runs = doc.format_text(&cfg.print_header, &options_map);
+        let header_runs = doc.format_text(&cfg.print_header, &header_footer_options);
         for run in header_runs {
             header_paragraph.add_text_run(run);
         }
@@ -2251,11 +2298,7 @@ pub fn generate(
         let mut footer_paragraph = crate::docx::adapter::docx::Paragraph::new();
         footer_paragraph.align(crate::docx::adapter::AlignmentType::Center);
 
-        // 使用 text2 方法格式化页脚文本，支持特殊字符
-        let mut options_map = HashMap::new();
-        options_map.insert("color".to_string(), "#777777".to_string());
-
-        let footer_runs = doc.format_text(&cfg.print_footer, &options_map);
+        let footer_runs = doc.format_text(&cfg.print_footer, &header_footer_options);
         for run in footer_runs {
             footer_paragraph.add_text_run(run);
         }
@@ -2310,6 +2353,30 @@ pub fn generate(
 
     // 添加样式定义
     doc.add_document_styles();
+
+    // 预计算常用的样式字符（避免重复获取）
+    use crate::utils::fountain_constants::FountainConstants;
+    let style_chars = FountainConstants::style_chars();
+    let _bold_char = style_chars["bold"];
+    let _underline_char = style_chars["underline"];
+
+    // 预计算常用的选项映射（避免重复创建）
+    let default_text_options = create_basic_options_map("#000000");
+
+    // 预计算双对话缩进值（避免重复计算）
+    let dial_indent_out = convert_inches_to_twip(3.0 * print.font_width);
+    let dial_indent_in = dial_indent_out / 2;
+
+    // 预计算各种对话类型的缩进值（避免重复计算）
+    let character_indent = convert_inches_to_twip(print.character.feed - print.left_margin);
+    let dialogue_indent = convert_inches_to_twip(print.dialogue.feed - print.left_margin);
+    let parenthetical_indent = convert_inches_to_twip(print.parenthetical.feed - print.left_margin);
+
+    // 预计算双对话的各种缩进组合
+    let character_indent_out = dial_indent_out * 3;
+    let character_indent_in = character_indent_out - dial_indent_in;
+    let parenthetical_indent_out = dial_indent_out * 2;
+    let parenthetical_indent_in = parenthetical_indent_out - dial_indent_in;
 
     // 初始化脚注页面数据结构 - 参考原项目 docxmaker.ts 中的 notesPage
     let mut notes_page: Vec<Vec<Vec<Note>>> = Vec::new();
@@ -2397,11 +2464,9 @@ pub fn generate(
             // 检查是否需要跳过空行
             if should_del_blank_line(&parsed.lines, ii, doc.rm_blank_line, &mut curr_type) {
                 // 只绘制样式，再跳过
-                let mut options_map = HashMap::new();
-                options_map.insert("color".to_string(), "#000000".to_string());
                 doc.text2(
                     &line.text,
-                    &options_map,
+                    &default_text_options,
                     if bottom_notes {
                         Some(&mut current_line_notes)
                     } else {
@@ -2428,11 +2493,9 @@ pub fn generate(
                     if is_blank_line_after_style(&line.text) {
                         // 只含有样式字符
                         // 只绘制样式，再跳过
-                        let mut options_map = HashMap::new();
-                        options_map.insert("color".to_string(), "#000000".to_string());
                         doc.text2(
                             &line.text,
-                            &options_map,
+                            &default_text_options,
                             if bottom_notes {
                                 Some(&mut current_line_notes)
                             } else {
@@ -2451,6 +2514,17 @@ pub fn generate(
             // 根据行类型处理
             let token_type = line.token_type.as_str();
             if token_type == "scene_heading" {
+                // 对话块结束，额外处理 (双对话 / 国内剧本对话) - 参考原项目逻辑
+                finish_dialogue_processing(
+                    doc,
+                    china_format,
+                    token_type,
+                    scene_or_section_or_tran_started,
+                    &mut section_main,
+                    &mut section_main_no_page_num,
+                    &print,
+                );
+                
                 if !scene_or_section_or_tran_started {
                     scene_or_section_or_tran_started = true;
                 }
@@ -2482,7 +2556,7 @@ pub fn generate(
                         let scene_text_length = scene_number.chars().count(); // 使用字符数而不是字节数
 
                         let left_char = if scene_text_length < 3 {
-                            (3 - scene_text_length)
+                            3 - scene_text_length
                         } else {
                             0
                         };
@@ -2514,13 +2588,12 @@ pub fn generate(
                 }
 
                 // 创建文本运行
-                let mut options_map = HashMap::new();
-                options_map.insert("color".to_string(), "#000000".to_string());
-                options_map.insert("characterSpacing".to_string(), "0".to_string());
+                let mut scene_options = default_text_options.clone();
+                scene_options.insert("characterSpacing".to_string(), "0".to_string());
 
                 let text_runs = doc.text2(
                     &text,
-                    &options_map,
+                    &scene_options,
                     if bottom_notes {
                         Some(&mut current_line_notes)
                     } else {
@@ -2534,48 +2607,28 @@ pub fn generate(
                     paragraph.add_text_run(run);
                 }
 
-                // 添加段落到相应的 section
-                if scene_or_section_or_tran_started {
-                    section_main.children.push(
-                        crate::docx::adapter::docx::SectionChild::Paragraph(paragraph),
-                    );
-                } else {
-                    section_main_no_page_num.children.push(
-                        crate::docx::adapter::docx::SectionChild::Paragraph(paragraph),
-                    );
-                }
-
-                // 更新行映射
-                if let Some(token_line) = line.token {
-                    if let Some(lm) = line_map.as_mut() {
-                        lm.insert(
-                            token_line,
-                            LineStruct {
-                                sections: current_sections.clone(),
-                                scene: current_scene.clone(),
-                                page: current_page,
-                                cumulative_duration: current_duration,
-                            },
-                        );
-                    }
-                }
+                // 添加段落到相应section并更新行映射
+                add_paragraph_and_update_line_map(
+                    crate::docx::adapter::docx::SectionChild::Paragraph(paragraph),
+                    line,
+                    scene_or_section_or_tran_started,
+                    &mut section_main,
+                    &mut section_main_no_page_num,
+                    &mut line_map,
+                    &current_sections,
+                    &current_scene,
+                    current_page,
+                    current_duration,
+                );
             } else if token_type == "action" {
                 // 非对话元素：完成缓存的中文格式对话和双对话
-                if china_format > 0 {
-                    doc.finish_china_dial_first(if scene_or_section_or_tran_started {
-                        &mut section_main
-                    } else {
-                        &mut section_main_no_page_num
-                    });
-                }
-
-                // 完成双对话处理 - 现在使用全局缓存
-                doc.finish_double_dial(
-                    if scene_or_section_or_tran_started {
-                        &mut section_main
-                    } else {
-                        &mut section_main_no_page_num
-                    },
+                finish_dialogue_processing(
+                    doc,
+                    china_format,
+                    token_type,
+                    scene_or_section_or_tran_started,
+                    &mut section_main,
+                    &mut section_main_no_page_num,
                     &print,
                 );
 
@@ -2595,12 +2648,9 @@ pub fn generate(
                 }
 
                 // 创建文本运行
-                let mut options_map = HashMap::new();
-                options_map.insert("color".to_string(), "#000000".to_string());
-
                 let text_runs = doc.text2(
                     &text,
-                    &options_map,
+                    &default_text_options,
                     if bottom_notes {
                         Some(&mut current_line_notes)
                     } else {
@@ -2614,52 +2664,28 @@ pub fn generate(
                     paragraph.add_text_run(run);
                 }
 
-                // 添加段落到相应的 section
-                if scene_or_section_or_tran_started {
-                    section_main.children.push(
-                        crate::docx::adapter::docx::SectionChild::Paragraph(paragraph),
-                    );
-                } else {
-                    section_main_no_page_num.children.push(
-                        crate::docx::adapter::docx::SectionChild::Paragraph(paragraph),
-                    );
-                }
-
-                // 更新行映射
-                if let Some(token_line) = line.token {
-                    // 在 Line 结构体中没有 time 字段，暂时忽略时间计算
-                    // if let Some(time) = line.time {
-                    //     current_duration += time as f32;
-                    // }
-                    if let Some(ref mut lm) = line_map {
-                        lm.insert(
-                            token_line,
-                            LineStruct {
-                                sections: current_sections.clone(),
-                                scene: current_scene.clone(),
-                                page: current_page,
-                                cumulative_duration: current_duration,
-                            },
-                        );
-                    }
-                }
+                // 添加段落到相应section并更新行映射
+                add_paragraph_and_update_line_map(
+                    crate::docx::adapter::docx::SectionChild::Paragraph(paragraph),
+                    line,
+                    scene_or_section_or_tran_started,
+                    &mut section_main,
+                    &mut section_main_no_page_num,
+                    &mut line_map,
+                    &current_sections,
+                    &current_scene,
+                    current_page,
+                    current_duration,
+                );
             } else if token_type == "centered" {
                 // 非对话元素：完成缓存的中文格式对话和双对话
-                if china_format > 0 {
-                    doc.finish_china_dial_first(if scene_or_section_or_tran_started {
-                        &mut section_main
-                    } else {
-                        &mut section_main_no_page_num
-                    });
-                }
-
-                // 完成双对话处理 - 现在使用全局缓存
-                doc.finish_double_dial(
-                    if scene_or_section_or_tran_started {
-                        &mut section_main
-                    } else {
-                        &mut section_main_no_page_num
-                    },
+                finish_dialogue_processing(
+                    doc,
+                    china_format,
+                    token_type,
+                    scene_or_section_or_tran_started,
+                    &mut section_main,
+                    &mut section_main_no_page_num,
                     &print,
                 );
 
@@ -2672,16 +2698,13 @@ pub fn generate(
                 paragraph.align(crate::docx::adapter::AlignmentType::Center);
 
                 // 处理文本
-                let mut text = line.text.clone();
+                let text = line.text.clone();
 
 
                 // 创建文本运行
-                let mut options_map = HashMap::new();
-                options_map.insert("color".to_string(), "#000000".to_string());
-
                 let text_runs = doc.text2(
                     &text,
-                    &options_map,
+                    &default_text_options,
                     if bottom_notes {
                         Some(&mut current_line_notes)
                     } else {
@@ -2695,18 +2718,32 @@ pub fn generate(
                     paragraph.add_text_run(run);
                 }
 
-                // 添加段落到相应的 section
-                if scene_or_section_or_tran_started {
-                    section_main.children.push(
-                        crate::docx::adapter::docx::SectionChild::Paragraph(paragraph),
-                    );
-                } else {
-                    section_main_no_page_num.children.push(
-                        crate::docx::adapter::docx::SectionChild::Paragraph(paragraph),
-                    );
-                }
+                // 添加段落到相应section并更新行映射
+                add_paragraph_and_update_line_map(
+                    crate::docx::adapter::docx::SectionChild::Paragraph(paragraph),
+                    line,
+                    scene_or_section_or_tran_started,
+                    &mut section_main,
+                    &mut section_main_no_page_num,
+                    &mut line_map,
+                    &current_sections,
+                    &current_scene,
+                    current_page,
+                    current_duration,
+                );
 
             } else if token_type == "synopsis" {
+                // 对话块结束，额外处理 (双对话 / 国内剧本对话) - 参考原项目逻辑
+                finish_dialogue_processing(
+                    doc,
+                    china_format,
+                    token_type,
+                    scene_or_section_or_tran_started,
+                    &mut section_main,
+                    &mut section_main_no_page_num,
+                    &print,
+                );
+                
                 // 处理 synopsis - 参考原项目逻辑
                 let mut feed = print.synopsis.feed.unwrap_or(print.action.feed);
 
@@ -2735,12 +2772,9 @@ pub fn generate(
                 let text = line.text.clone();
 
                 // 创建文本运行
-                let mut options_map = HashMap::new();
-                options_map.insert("color".to_string(), "#000000".to_string());
-
                 let text_runs = doc.text2(
                     &text,
-                    &options_map,
+                    &default_text_options,
                     if bottom_notes {
                         Some(&mut current_line_notes)
                     } else {
@@ -2754,16 +2788,19 @@ pub fn generate(
                     paragraph.add_text_run(run);
                 }
 
-                // 添加段落到相应的 section
-                if scene_or_section_or_tran_started {
-                    section_main.children.push(
-                        crate::docx::adapter::docx::SectionChild::Paragraph(paragraph),
-                    );
-                } else {
-                    section_main_no_page_num.children.push(
-                        crate::docx::adapter::docx::SectionChild::Paragraph(paragraph),
-                    );
-                }
+                // 添加段落到相应section并更新行映射
+                add_paragraph_and_update_line_map(
+                    crate::docx::adapter::docx::SectionChild::Paragraph(paragraph),
+                    line,
+                    scene_or_section_or_tran_started,
+                    &mut section_main,
+                    &mut section_main_no_page_num,
+                    &mut line_map,
+                    &current_sections,
+                    &current_scene,
+                    current_page,
+                    current_duration,
+                );
             } else if token_type == "dialogue"
                 || token_type == "character"
                 || token_type == "parenthetical"
@@ -2827,12 +2864,9 @@ pub fn generate(
                 }
 
                 // 创建文本运行
-                let mut options_map = HashMap::new();
-                options_map.insert("color".to_string(), "#000000".to_string());
-
                 let text_runs = doc.text2(
                     &text,
-                    &options_map,
+                    &default_text_options,
                     if bottom_notes {
                         Some(&mut current_line_notes)
                     } else {
@@ -2846,10 +2880,6 @@ pub fn generate(
                     // 中文格式：使用缓存拼接机制
                     println!("【generate】中文格式处理，china_format = {}", china_format);
                     if line.token_type == "character" {
-                        // 计算双对话缩进
-                        let dial_indent_out = convert_inches_to_twip(3.0 * print.font_width);
-                        let dial_indent_in = dial_indent_out / 2;
-
                         // 根据 dual 属性决定缓存位置
                         if line.dual.as_deref() == Some("left") {
                             println!("【generate】缓存左侧双对话角色: {}", text);
@@ -2886,10 +2916,6 @@ pub fn generate(
                                 dial_gr_left.children.extend(text_runs);
                             } else {
                                 // 如果没有缓存的左侧角色名，直接添加到表格 - 参考原项目逻辑
-                                let dial_indent_out =
-                                    convert_inches_to_twip(3.0 * print.font_width);
-                                let dial_indent_in = dial_indent_out / 2;
-
                                 let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
                                 paragraph.style("dial");
                                 paragraph.indent(dial_indent_out);
@@ -2911,10 +2937,6 @@ pub fn generate(
                                 dial_gr_right.children.extend(text_runs);
                             } else {
                                 // 如果没有缓存的右侧角色名，直接添加到表格 - 参考原项目逻辑
-                                let dial_indent_out =
-                                    convert_inches_to_twip(3.0 * print.font_width);
-                                let dial_indent_in = dial_indent_out / 2;
-
                                 let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
                                 paragraph.style("dial");
                                 paragraph.indent(dial_indent_in);
@@ -2994,10 +3016,6 @@ pub fn generate(
                                 // china_format == 3 || china_format == 4 时继续缓存，等待更多对白
                             } else {
                                 // 如果没有缓存的左侧角色名，直接输出到全局表格缓存
-                                let dial_indent_out =
-                                    convert_inches_to_twip(3.0 * print.font_width);
-                                let dial_indent_in = dial_indent_out / 2;
-
                                 let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
                                 paragraph.style("dial");
                                 paragraph.indent(dial_indent_out);
@@ -3047,10 +3065,6 @@ pub fn generate(
                                 // china_format == 3 || china_format == 4 时继续缓存，等待更多对白
                             } else {
                                 // 如果没有缓存的右侧角色名，直接输出到全局表格缓存
-                                let dial_indent_out =
-                                    convert_inches_to_twip(3.0 * print.font_width);
-                                let dial_indent_in = dial_indent_out / 2;
-
                                 let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
                                 paragraph.style("dial");
                                 paragraph.indent(dial_indent_in);
@@ -3131,10 +3145,6 @@ pub fn generate(
                         // 双对话：添加到全局表格缓存
                         println!("【generate】国际格式双对话: {} - {}", line.token_type, text);
 
-                        // 计算双对话缩进
-                        let dial_indent_out = convert_inches_to_twip(3.0 * print.font_width);
-                        let dial_indent_in = dial_indent_out / 2;
-
                         let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
 
                         if line.token_type == "dialogue" {
@@ -3148,8 +3158,6 @@ pub fn generate(
                             }
                         } else if line.token_type == "character" {
                             paragraph.style("character");
-                            let character_indent_out = dial_indent_out * 3;
-                            let character_indent_in = character_indent_out - dial_indent_in;
                             if line.dual.as_deref() == Some("left") {
                                 paragraph.indent(character_indent_out);
                                 paragraph.indent_right(character_indent_in);
@@ -3159,8 +3167,6 @@ pub fn generate(
                             }
                         } else if line.token_type == "parenthetical" {
                             paragraph.style("parenthetical");
-                            let parenthetical_indent_out = dial_indent_out * 2;
-                            let parenthetical_indent_in = parenthetical_indent_out - dial_indent_in;
                             if line.dual.as_deref() == Some("left") {
                                 paragraph.indent(parenthetical_indent_out);
                                 paragraph.indent_right(parenthetical_indent_in);
@@ -3188,19 +3194,12 @@ pub fn generate(
 
                         if line.token_type == "dialogue" {
                             paragraph.style("dial");
-                            let dial_indent =
-                                convert_inches_to_twip(print.dialogue.feed - print.left_margin);
-                            paragraph.indent(dial_indent);
+                            paragraph.indent(dialogue_indent);
                         } else if line.token_type == "character" {
                             paragraph.style("character");
-                            let character_indent =
-                                convert_inches_to_twip(print.character.feed - print.left_margin);
                             paragraph.indent(character_indent);
                         } else if line.token_type == "parenthetical" {
                             paragraph.style("parenthetical");
-                            let parenthetical_indent = convert_inches_to_twip(
-                                print.parenthetical.feed - print.left_margin,
-                            );
                             paragraph.indent(parenthetical_indent);
                         }
 
@@ -3220,7 +3219,7 @@ pub fn generate(
                     }
                 }
 
-                // 更新行映射
+                // 更新行映射（对话类型不需要添加段落，因为已经在对话处理逻辑中处理）
                 if let Some(token_line) = line.token {
                     // 在 Line 结构体中没有 time 字段，暂时忽略时间计算
                     // if let Some(time) = line.time {
@@ -3233,48 +3232,22 @@ pub fn generate(
                                 sections: current_sections.clone(),
                                 scene: current_scene.clone(),
                                 page: current_page,
-                                cumulative_duration: current_duration,
+                                cumulative_duration: current_duration as f32,
                             },
                         );
                     }
                 }
             } else if token_type == "section" {
                 // 对话块结束，额外处理 (双对话 / 国内剧本对话) - 参考原项目逻辑
-
-                if china_format > 0 {
-                    doc.finish_china_dial_first(if scene_or_section_or_tran_started {
-                        &mut section_main
-                    } else {
-                        &mut section_main_no_page_num
-                    });
-                }
-
-                // 参考原项目逻辑：检查是否需要完成双对话
-                // if (lastDialTableRight.length > 0) {
-                //     finish_double_dial();
-                // } else if (lines[ii].type !== "separator") {
-                //     finish_double_dial();
-                // }
-                // 注意：需要在调用finish_double_dial之前检查，因为该方法会清空缓存
-                let has_right_table_content = !doc.last_dial_table_right.is_empty();
-                let has_left_or_right_cache =
-                    doc.last_dial_gr_left.is_some() || doc.last_dial_gr_right.is_some();
-                let has_global_table_content =
-                    !doc.last_dial_table_left.is_empty() || !doc.last_dial_table_right.is_empty();
-                if has_right_table_content
-                    || has_left_or_right_cache
-                    || has_global_table_content
-                    || token_type != "separator"
-                {
-                    doc.finish_double_dial(
-                        if scene_or_section_or_tran_started {
-                            &mut section_main
-                        } else {
-                            &mut section_main_no_page_num
-                        },
-                        &print,
-                    );
-                }
+                finish_dialogue_processing(
+                    doc,
+                    china_format,
+                    token_type,
+                    scene_or_section_or_tran_started,
+                    &mut section_main,
+                    &mut section_main_no_page_num,
+                    &print,
+                );
 
                 if !scene_or_section_or_tran_started {
                     scene_or_section_or_tran_started = true;
@@ -3318,16 +3291,15 @@ pub fn generate(
                 let text = line.text.clone();
 
                 // 创建文本运行
-                let mut options_map = HashMap::new();
-                if let Some(color) = print.section.color.as_ref() {
-                    options_map.insert("color".to_string(), color.clone());
+                let section_options = if let Some(color) = print.section.color.as_ref() {
+                    create_basic_options_map(color)
                 } else {
-                    options_map.insert("color".to_string(), "#000000".to_string());
-                }
+                    default_text_options.clone()
+                };
 
                 let text_runs = doc.text2(
                     &text,
-                    &options_map,
+                    &section_options,
                     if bottom_notes {
                         Some(&mut current_line_notes)
                     } else {
@@ -3341,61 +3313,30 @@ pub fn generate(
                     paragraph.add_text_run(run);
                 }
 
-                // 添加段落到相应的 section
-                if scene_or_section_or_tran_started {
-                    section_main.children.push(
-                        crate::docx::adapter::docx::SectionChild::Paragraph(paragraph),
-                    );
-                } else {
-                    section_main_no_page_num.children.push(
-                        crate::docx::adapter::docx::SectionChild::Paragraph(paragraph),
-                    );
-                }
-
-                // 更新行映射
-                if let Some(token_line) = line.token {
-                    if let Some(ref mut lm) = line_map {
-                        lm.insert(
-                            token_line,
-                            LineStruct {
-                                sections: current_sections.clone(),
-                                scene: current_scene.clone(),
-                                page: current_page,
-                                cumulative_duration: current_duration,
-                            },
-                        );
-                    }
-                }
+                // 添加段落到相应section并更新行映射
+                add_paragraph_and_update_line_map(
+                    crate::docx::adapter::docx::SectionChild::Paragraph(paragraph),
+                    line,
+                    scene_or_section_or_tran_started,
+                    &mut section_main,
+                    &mut section_main_no_page_num,
+                    &mut line_map,
+                    &current_sections,
+                    &current_scene,
+                    current_page,
+                    current_duration,
+                );
             } else if token_type == "transition" {
                 // 对话块结束，额外处理 (双对话 / 国内剧本对话) - 参考原项目逻辑
-                if china_format > 0 {
-                    doc.finish_china_dial_first(if scene_or_section_or_tran_started {
-                        &mut section_main
-                    } else {
-                        &mut section_main_no_page_num
-                    });
-                }
-
-                // 参考原项目逻辑：检查是否需要完成双对话
-                let has_right_table_content = !doc.last_dial_table_right.is_empty();
-                let has_left_or_right_cache =
-                    doc.last_dial_gr_left.is_some() || doc.last_dial_gr_right.is_some();
-                let has_global_table_content =
-                    !doc.last_dial_table_left.is_empty() || !doc.last_dial_table_right.is_empty();
-                if has_right_table_content
-                    || has_left_or_right_cache
-                    || has_global_table_content
-                    || token_type != "separator"
-                {
-                    doc.finish_double_dial(
-                        if scene_or_section_or_tran_started {
-                            &mut section_main
-                        } else {
-                            &mut section_main_no_page_num
-                        },
-                        &print,
-                    );
-                }
+                finish_dialogue_processing(
+                    doc,
+                    china_format,
+                    token_type,
+                    scene_or_section_or_tran_started,
+                    &mut section_main,
+                    &mut section_main_no_page_num,
+                    &print,
+                );
 
                 if !scene_or_section_or_tran_started {
                     scene_or_section_or_tran_started = true;
@@ -3460,17 +3401,16 @@ pub fn generate(
                 }
 
                 // 创建文本运行
-                let mut options_map = HashMap::new();
-                options_map.insert("color".to_string(), "#000000".to_string());
+                let mut transition_options = default_text_options.clone();
 
                 // 如果是镜头交切，设置粗体
                 if is_shot_cut {
-                    options_map.insert("bold".to_string(), "true".to_string());
+                    transition_options.insert("bold".to_string(), "true".to_string());
                 }
 
                 let text_runs = doc.text2(
                     &text,
-                    &options_map,
+                    &transition_options,
                     if bottom_notes {
                         Some(&mut current_line_notes)
                     } else {
@@ -3484,122 +3424,59 @@ pub fn generate(
                     paragraph.add_text_run(run);
                 }
 
-                // 添加段落到相应的 section
-                if scene_or_section_or_tran_started {
-                    section_main.children.push(
-                        crate::docx::adapter::docx::SectionChild::Paragraph(paragraph),
-                    );
-                } else {
-                    section_main_no_page_num.children.push(
-                        crate::docx::adapter::docx::SectionChild::Paragraph(paragraph),
-                    );
-                }
-
-                // 更新行映射
-                if let Some(token_line) = line.token {
-                    if let Some(ref mut lm) = line_map {
-                        lm.insert(
-                            token_line,
-                            LineStruct {
-                                sections: current_sections.clone(),
-                                scene: current_scene.clone(),
-                                page: current_page,
-                                cumulative_duration: current_duration,
-                            },
-                        );
-                    }
-                }
+                // 添加段落到相应section并更新行映射
+                add_paragraph_and_update_line_map(
+                    crate::docx::adapter::docx::SectionChild::Paragraph(paragraph),
+                    line,
+                    scene_or_section_or_tran_started,
+                    &mut section_main,
+                    &mut section_main_no_page_num,
+                    &mut line_map,
+                    &current_sections,
+                    &current_scene,
+                    current_page,
+                    current_duration,
+                );
             } else if token_type == "page_break" {
                 // 对话块结束，额外处理 (双对话 / 国内剧本对话) - 参考原项目逻辑
-
-                if china_format > 0 {
-                    doc.finish_china_dial_first(if scene_or_section_or_tran_started {
-                        &mut section_main
-                    } else {
-                        &mut section_main_no_page_num
-                    });
-                }
-
-                // 参考原项目逻辑：检查是否需要完成双对话
-                let has_right_table_content = !doc.last_dial_table_right.is_empty();
-                let has_left_or_right_cache =
-                    doc.last_dial_gr_left.is_some() || doc.last_dial_gr_right.is_some();
-                let has_global_table_content =
-                    !doc.last_dial_table_left.is_empty() || !doc.last_dial_table_right.is_empty();
-                if has_right_table_content
-                    || has_left_or_right_cache
-                    || has_global_table_content
-                    || token_type != "separator"
-                {
-                    doc.finish_double_dial(
-                        if scene_or_section_or_tran_started {
-                            &mut section_main
-                        } else {
-                            &mut section_main_no_page_num
-                        },
-                        &print,
-                    );
-                }
-
-                // 添加分页符到相应的 section
-                if scene_or_section_or_tran_started {
-                    section_main
-                        .children
-                        .push(crate::docx::adapter::docx::SectionChild::PageBreak);
-                } else {
-                    section_main_no_page_num
-                        .children
-                        .push(crate::docx::adapter::docx::SectionChild::PageBreak);
-                }
-
+                finish_dialogue_processing(
+                    doc,
+                    china_format,
+                    token_type,
+                    scene_or_section_or_tran_started,
+                    &mut section_main,
+                    &mut section_main_no_page_num,
+                    &print,
+                );
+                
                 // 更新页码
                 current_page += 1;
+                
+                // 添加段落到相应section并更新行映射
+                add_paragraph_and_update_line_map(
+                    crate::docx::adapter::docx::SectionChild::PageBreak,
+                    line,
+                    scene_or_section_or_tran_started,
+                    &mut section_main,
+                    &mut section_main_no_page_num,
+                    &mut line_map,
+                    &current_sections,
+                    &current_scene,
+                    current_page,
+                    current_duration,
+                );
 
-                // 更新行映射
-                if let Some(token_line) = line.token {
-                    if let Some(ref mut lm) = line_map {
-                        lm.insert(
-                            token_line,
-                            LineStruct {
-                                sections: current_sections.clone(),
-                                scene: current_scene.clone(),
-                                page: current_page,
-                                cumulative_duration: current_duration,
-                            },
-                        );
-                    }
-                }
             } else {
                 // 对话块结束，额外处理 (双对话 / 国内剧本对话) - 参考原项目逻辑
-
-                if china_format > 0 {
-                    doc.finish_china_dial_first(if scene_or_section_or_tran_started {
-                        &mut section_main
-                    } else {
-                        &mut section_main_no_page_num
-                    });
-                }
-
-                // 参考原项目逻辑：检查是否需要完成双对话
-                let has_right_table_content = !doc.last_dial_table_right.is_empty();
-                let has_left_or_right_cache =
-                    doc.last_dial_gr_left.is_some() || doc.last_dial_gr_right.is_some();
-                let has_global_table_content =
-                    !doc.last_dial_table_left.is_empty() || !doc.last_dial_table_right.is_empty();
-                if has_right_table_content
-                    || has_left_or_right_cache
-                    || has_global_table_content
-                    || token_type != "separator"
-                {
-                    doc.finish_double_dial(
-                        if scene_or_section_or_tran_started {
-                            &mut section_main
-                        } else {
-                            &mut section_main_no_page_num
-                        },
-                        &print,
-                    );
-                }
+                finish_dialogue_processing(
+                    doc,
+                    china_format,
+                    token_type,
+                    scene_or_section_or_tran_started,
+                    &mut section_main,
+                    &mut section_main_no_page_num,
+                    &print,
+                );
 
                 // 处理其他类型的token
                 let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
@@ -3617,12 +3494,9 @@ pub fn generate(
                 });
 
                 // 创建文本运行
-                let mut options_map = HashMap::new();
-                options_map.insert("color".to_string(), "#000000".to_string());
-
                 let text_runs = doc.text2(
                     &line.text,
-                    &options_map,
+                    &default_text_options,
                     if bottom_notes {
                         Some(&mut current_line_notes)
                     } else {
@@ -3636,31 +3510,19 @@ pub fn generate(
                     paragraph.add_text_run(run);
                 }
 
-                // 添加段落到相应的 section
-                if scene_or_section_or_tran_started {
-                    section_main.children.push(
-                        crate::docx::adapter::docx::SectionChild::Paragraph(paragraph),
-                    );
-                } else {
-                    section_main_no_page_num.children.push(
-                        crate::docx::adapter::docx::SectionChild::Paragraph(paragraph),
-                    );
-                }
-
-                // 更新行映射
-                if let Some(token_line) = line.token {
-                    if let Some(ref mut lm) = line_map {
-                        lm.insert(
-                            token_line,
-                            LineStruct {
-                                sections: current_sections.clone(),
-                                scene: current_scene.clone(),
-                                page: current_page,
-                                cumulative_duration: current_duration,
-                            },
-                        );
-                    }
-                }
+                // 添加段落到相应section并更新行映射
+                add_paragraph_and_update_line_map(
+                    crate::docx::adapter::docx::SectionChild::Paragraph(paragraph),
+                    line,
+                    scene_or_section_or_tran_started,
+                    &mut section_main,
+                    &mut section_main_no_page_num,
+                    &mut line_map,
+                    &current_sections,
+                    &current_scene,
+                    current_page,
+                    current_duration,
+                );
             }
 
             // 更新 after_section 状态 - 参考原项目逻辑
@@ -3678,22 +3540,13 @@ pub fn generate(
     }
 
     // 完成所有缓存的中文格式对话和双对话 - 参考原项目逻辑
-
-    if china_format > 0 {
-        doc.finish_china_dial_first(if scene_or_section_or_tran_started {
-            &mut section_main
-        } else {
-            &mut section_main_no_page_num
-        });
-    }
-
-    // 文档结束时，无条件完成剩余的双对话处理
-    doc.finish_double_dial(
-        if scene_or_section_or_tran_started {
-            &mut section_main
-        } else {
-            &mut section_main_no_page_num
-        },
+    finish_dialogue_processing(
+        doc,
+        china_format,
+        "document_end", // 特殊标记表示文档结束
+        scene_or_section_or_tran_started,
+        &mut section_main,
+        &mut section_main_no_page_num,
         &print,
     );
 
@@ -3743,12 +3596,11 @@ pub fn generate(
                     paragraph.style("notes");
 
                     // 创建文本运行 - 参考原项目使用固定颜色 #868686
-                    let mut options_map = HashMap::new();
-                    options_map.insert("color".to_string(), "#868686".to_string());
-                    options_map.insert("fontSize".to_string(), print.note_font_size.to_string());
-                    options_map.insert("characterSpacing".to_string(), "0".to_string());
+                    let mut footnote_options = create_basic_options_map("#868686");
+                    footnote_options.insert("fontSize".to_string(), print.note_font_size.to_string());
+                    footnote_options.insert("characterSpacing".to_string(), "0".to_string());
 
-                    let text_runs = doc.format_text(&text, &options_map);
+                    let text_runs = doc.format_text(&text, &footnote_options);
 
                     // 添加文本运行到段落
                     for run in text_runs {
