@@ -1689,6 +1689,62 @@ pub async fn init_doc(options: DocxOptions) -> DocxContext {
     context
 }
 /// 清理文本中的格式标记
+fn if_reset_format(input: String, line: &Line) -> String {
+    // 检查行类型是否需要重置格式
+    if line.token_type == "character"
+        || line.token_type == "scene_heading"
+        || line.token_type == "synopsis"
+        || line.token_type == "centered"
+        || line.token_type == "section"
+        || line.token_type == "transition"
+        || line.token_type == "lyric"
+    {
+        // 在 Rust 实现中，我们假设所有这些类型的行都需要重置格式
+        // 因为当前的 Line 结构体没有 is_wrap 字段
+        // 如果将来需要更精确的控制，可以在 Line 结构体中添加 is_wrap 字段
+        use crate::utils::fountain_constants::FountainConstants;
+        let style_chars = FountainConstants::style_chars();
+        let style_global_clean = style_chars.get("style_global_clean").unwrap().to_string(); // "⇜"
+
+        return add_tag_after_broken_note(input, style_global_clean);
+    }
+
+    input
+}
+fn add_tag_after_broken_note(input: String, tag: String) -> String {
+    use crate::utils::fountain_constants::FountainConstants;
+    let style_chars = FountainConstants::style_chars();
+
+    let note_begin = style_chars.get("note_begin").unwrap(); // "↺"
+    let note_end = style_chars.get("note_end").unwrap();     // "↻"
+
+    // 查找 note_end 的位置
+    if let Some(iend) = input.find(note_end) {
+        // 查找 note_begin 的位置
+        if let Some(istart) = input.find(note_begin) {
+            // 如果 note_end 在 note_begin 之前，说明是破损的注释
+            if iend < istart {
+                // 在 note_end 之后插入 tag
+                let mut result = String::new();
+                result.push_str(&input[..iend + note_end.len()]);
+                result.push_str(&tag);
+                result.push_str(&input[iend + note_end.len()..]);
+                return result;
+            }
+        } else {
+            // 没有找到 note_begin，但找到了 note_end，说明是破损的注释
+            // 在 note_end 之后插入 tag
+            let mut result = String::new();
+            result.push_str(&input[..iend + note_end.len()]);
+            result.push_str(&tag);
+            result.push_str(&input[iend + note_end.len()..]);
+            return result;
+        }
+    }
+
+    // 如果没有找到 note_end 或者注释结构正常，在开头添加 tag
+    format!("{}{}", tag, input)
+}
 fn clear_formatting(text: &str) -> String {
     // 清除所有的格式化标记，如 *粗体*, _斜体_, **粗体**, __斜体__
     let mut result = text.to_string();
