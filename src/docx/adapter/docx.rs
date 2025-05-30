@@ -672,7 +672,10 @@ impl Document {
             if let Some(footers) = &section.footers {
                 // 检查页脚是否包含页码
                 let has_page_numbers = footers.default.children.iter().any(|paragraph| {
-                    paragraph.runs.iter().any(|run| matches!(run, RunType::PageNumber(_)))
+                    paragraph
+                        .runs
+                        .iter()
+                        .any(|run| matches!(run, RunType::PageNumber(_)))
                 });
 
                 if has_page_numbers {
@@ -686,7 +689,11 @@ impl Document {
         // 新策略：由业务层决定每个section是否有页眉页脚
         // 适配器只负责根据section配置来设置页眉页脚
         if main_section_with_page_numbers.is_some() {
-            println!("【create_document】找到包含页码的section（索引: {}），正文页从第{}页开始", sections_before_main, sections_before_main + 1);
+            println!(
+                "【create_document】找到包含页码的section（索引: {}），正文页从第{}页开始",
+                sections_before_main,
+                sections_before_main + 1
+            );
             println!("【create_document】页眉页脚的显示由业务层通过section配置决定");
         } else {
             println!("【create_document】未找到包含页码的section");
@@ -709,29 +716,40 @@ impl Document {
         }
 
         if let Some((first_index, first_section)) = first_section_with_headers_footers {
-            println!("【create_document】找到第一个有页眉页脚的section（索引: {}），设置全局页眉页脚", first_index);
+            println!(
+                "【create_document】找到第一个有页眉页脚的section（索引: {}），设置全局页眉页脚",
+                first_index
+            );
 
             // 设置全局页眉页脚
             if let Some(headers) = &first_section.headers {
                 let mut docx_header = docx_rs::Header::new();
                 for paragraph in &headers.default.children {
-                    docx_header = docx_header.add_paragraph(
-                        paragraph.to_docx_paragraph(self.options.styles.clone(), self.options.footnotes.clone())
-                    );
+                    docx_header = docx_header.add_paragraph(paragraph.to_docx_paragraph(
+                        self.options.styles.clone(),
+                        self.options.footnotes.clone(),
+                    ));
                 }
                 docx = docx.header(docx_header);
-                println!("【create_document】已设置全局页眉，包含 {} 个段落", headers.default.children.len());
+                println!(
+                    "【create_document】已设置全局页眉，包含 {} 个段落",
+                    headers.default.children.len()
+                );
             }
 
             if let Some(footers) = &first_section.footers {
                 let mut docx_footer = docx_rs::Footer::new();
                 for paragraph in &footers.default.children {
-                    docx_footer = docx_footer.add_paragraph(
-                        paragraph.to_docx_paragraph(self.options.styles.clone(), self.options.footnotes.clone())
-                    );
+                    docx_footer = docx_footer.add_paragraph(paragraph.to_docx_paragraph(
+                        self.options.styles.clone(),
+                        self.options.footnotes.clone(),
+                    ));
                 }
                 docx = docx.footer(docx_footer);
-                println!("【create_document】已设置全局页脚，包含 {} 个段落", footers.default.children.len());
+                println!(
+                    "【create_document】已设置全局页脚，包含 {} 个段落",
+                    footers.default.children.len()
+                );
             }
 
             // 关键：如果第一个有页眉页脚的section不是第一个section，
@@ -755,7 +773,10 @@ impl Document {
                 if let Some(page_size) = &page_properties.size {
                     // 尝试使用page_size方法
                     docx = docx.page_size(page_size.width as u32, page_size.height as u32);
-                    println!("【create_document】已应用页面大小: {}x{} twip", page_size.width, page_size.height);
+                    println!(
+                        "【create_document】已应用页面大小: {}x{} twip",
+                        page_size.width, page_size.height
+                    );
                 }
 
                 // 设置页面边距
@@ -768,7 +789,7 @@ impl Document {
                             .bottom(page_margin.bottom)
                             .left(page_margin.left)
                             .header(page_margin.header)
-                            .footer(page_margin.footer)
+                            .footer(page_margin.footer),
                     );
                     println!("【create_document】已应用页面边距: top={}, right={}, bottom={}, left={}, header={}, footer={}",
                         page_margin.top, page_margin.right, page_margin.bottom,
@@ -916,8 +937,6 @@ impl Document {
                 children_to_process.len()
             );
 
-
-
             // 添加节的子元素
             for child in children_to_process {
                 match child {
@@ -941,8 +960,6 @@ impl Document {
                     }
                 }
             }
-
-
         }
 
         // 添加脚注 - 使用docx-rs的真正脚注功能
@@ -1467,7 +1484,12 @@ impl RunTrait for TextRun {
         if let (Some(footnote_id), Some(footnote_content)) =
             (&self.footnote_id, &self.footnote_content)
         {
-            println!("【to_docx_run】创建脚注引用，ID: {}, 内容段落数: {}, 收集到脚注：{}", footnote_id, footnote_content.len(), footnotes.len());
+            println!(
+                "【to_docx_run】创建脚注引用，ID: {}, 内容段落数: {}, 收集到脚注：{}",
+                footnote_id,
+                footnote_content.len(),
+                footnotes.len()
+            );
             let mut footnote = docx_rs::Footnote::new();
 
             // 添加脚注内容 - 使用已经格式化好的TextRun
@@ -1493,7 +1515,11 @@ impl RunTrait for TextRun {
                 // 如果没有内容，添加默认内容（不设置样式，由外层控制）
                 // 从footnotes找到与 footnote_id 匹配的脚注
                 if let Some(fnote) = footnotes.get(footnote_id) {
-                    println!("【to_docx_run】基q全局收集创建脚注引用，ID: {}, 内容段落数: {}", footnote_id, fnote.children.len());
+                    println!(
+                        "【to_docx_run】基q全局收集创建脚注引用，ID: {}, 内容段落数: {}",
+                        footnote_id,
+                        fnote.children.len()
+                    );
                     // 使用脚注的段落创建默认内容
                     for (i, pg) in fnote.children.iter().enumerate() {
                         // 使用TextRun的to_docx_run方法，保持原有的格式
@@ -1516,7 +1542,11 @@ impl RunTrait for TextRun {
             }
 
             // 创建带有脚注引用的运行
-            return docx_rs::Run::new().add_footnote_reference(footnote);
+            return docx_rs::Run::new()
+                .add_footnote_reference_with_size(
+                    footnote,
+                    (self.props.size.unwrap_or(24) as f64 * 1.3) as usize,
+                );
         }
 
         // 普通文本运行
