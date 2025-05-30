@@ -153,6 +153,17 @@ pub enum LineRuleType {
     Auto,
 }
 
+impl LineRuleType {
+    /// 转换为 docx-rs 的 LineSpacingType
+    pub fn to_docx_line_spacing_type(&self) -> docx_rs::LineSpacingType {
+        match self {
+            LineRuleType::Exact => docx_rs::LineSpacingType::Exact,
+            LineRuleType::AtLeast => docx_rs::LineSpacingType::AtLeast,
+            LineRuleType::Auto => docx_rs::LineSpacingType::Auto,
+        }
+    }
+}
+
 /// 行规则类型常量
 pub struct LineRuleTypeConst;
 

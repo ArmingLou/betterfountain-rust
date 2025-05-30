@@ -13,6 +13,8 @@ use std::path::Path;
 pub struct ParagraphSpacing {
     pub before: Option<i32>,
     pub after: Option<i32>,
+    pub before_lines: Option<i32>,
+    pub after_lines: Option<i32>,
     pub line: Option<i32>,
     pub line_rule: Option<super::LineRuleType>,
 }
@@ -23,24 +25,38 @@ impl ParagraphSpacing {
         Self {
             before: None,
             after: None,
+            before_lines: None,
+            after_lines: None,
             line: None,
             line_rule: None,
         }
     }
 
-    /// 设置段前间距
+    /// 设置段前间距（twips）
     pub fn before(mut self, before: i32) -> Self {
         self.before = Some(before);
         self
     }
 
-    /// 设置段后间距
+    /// 设置段后间距（twips）
     pub fn after(mut self, after: i32) -> Self {
         self.after = Some(after);
         self
     }
 
-    /// 设置行间距
+    /// 设置段前间距（行数）
+    pub fn before_lines(mut self, before_lines: i32) -> Self {
+        self.before_lines = Some(before_lines);
+        self
+    }
+
+    /// 设置段后间距（行数）
+    pub fn after_lines(mut self, after_lines: i32) -> Self {
+        self.after_lines = Some(after_lines);
+        self
+    }
+
+    /// 设置行间距（twips）
     pub fn line(mut self, line: i32) -> Self {
         self.line = Some(line);
         self
@@ -50,6 +66,44 @@ impl ParagraphSpacing {
     pub fn line_rule(mut self, line_rule: super::LineRuleType) -> Self {
         self.line_rule = Some(line_rule);
         self
+    }
+
+    /// 转换为 docx-rs 的 LineSpacing
+    pub fn to_docx_line_spacing(&self) -> docx_rs::LineSpacing {
+        let mut spacing = docx_rs::LineSpacing::new();
+
+        if let Some(before) = self.before {
+            println!("【适配器日志】设置段前间距: {} twips", before);
+            spacing = spacing.before(before as u32);
+        }
+
+        if let Some(after) = self.after {
+            println!("【适配器日志】设置段后间距: {} twips", after);
+            spacing = spacing.after(after as u32);
+        }
+
+        if let Some(before_lines) = self.before_lines {
+            println!("【适配器日志】设置段前行数: {}", before_lines);
+            spacing = spacing.before_lines(before_lines as u32);
+        }
+
+        if let Some(after_lines) = self.after_lines {
+            println!("【适配器日志】设置段后行数: {}", after_lines);
+            spacing = spacing.after_lines(after_lines as u32);
+        }
+
+        if let Some(line) = self.line {
+            println!("【适配器日志】设置行距: {} twips ({:.1}倍单倍行距)", line, line as f32 / 240.0);
+            spacing = spacing.line(line);
+        }
+
+        if let Some(line_rule) = self.line_rule {
+            let rule_type = line_rule.to_docx_line_spacing_type();
+            println!("【适配器日志】设置行距类型: {:?}", rule_type);
+            spacing = spacing.line_rule(rule_type);
+        }
+
+        spacing
     }
 }
 
@@ -578,8 +632,7 @@ impl Document {
                 // 设置间距
                 if let Some(spacing) = &paragraph_style.spacing {
                     if let Some(_line) = spacing.line {
-                        // docx-rs 可能不支持复杂的行间距设置，暂时跳过
-                        // paragraph_property = paragraph_property.line_spacing(line);
+                        paragraph_property = paragraph_property.line_spacing(spacing.to_docx_line_spacing());
                     }
                 }
 
@@ -1047,6 +1100,17 @@ impl Paragraph {
             outline_level: None,
         }
     }
+    pub fn new_with_spacing(spacing: ParagraphSpacing) -> Self {
+        Self {
+            runs: Vec::new(),
+            alignment: None,
+            indent: None,
+            style: None,
+            spacing: Some(spacing),
+            frame: None,
+            outline_level: None,
+        }
+    }
 
     /// 添加文本运行
     pub fn add_text_run(&mut self, run: TextRun) -> &mut Self {
@@ -1132,6 +1196,82 @@ impl Paragraph {
         self
     }
 
+    /// 设置行距（便捷方法）
+    pub fn line_spacing(&mut self, spacing: ParagraphSpacing) -> &mut Self {
+        self.spacing = Some(spacing);
+        self
+    }
+
+    /// 设置单倍行距
+    pub fn single_line_spacing(&mut self) -> &mut Self {
+        self.spacing = Some(
+            ParagraphSpacing::new()
+                .line_rule(super::LineRuleType::Auto)
+                .line(240), // 240 twips = 12pt = 单倍行距
+        );
+        self
+    }
+
+    /// 设置1.5倍行距
+    pub fn one_and_half_line_spacing(&mut self) -> &mut Self {
+        self.spacing = Some(
+            ParagraphSpacing::new()
+                .line_rule(super::LineRuleType::Auto)
+                .line(360), // 360 twips = 18pt = 1.5倍行距
+        );
+        self
+    }
+
+    /// 设置双倍行距
+    pub fn double_line_spacing(&mut self) -> &mut Self {
+        self.spacing = Some(
+            ParagraphSpacing::new()
+                .line_rule(super::LineRuleType::Auto)
+                .line(480), // 480 twips = 24pt = 双倍行距
+        );
+        self
+    }
+
+    /// 设置固定行距
+    pub fn exact_line_spacing(&mut self, twips: i32) -> &mut Self {
+        self.spacing = Some(
+            ParagraphSpacing::new()
+                .line_rule(super::LineRuleType::Exact)
+                .line(twips),
+        );
+        self
+    }
+
+    /// 设置最小行距
+    pub fn at_least_line_spacing(&mut self, twips: i32) -> &mut Self {
+        self.spacing = Some(
+            ParagraphSpacing::new()
+                .line_rule(super::LineRuleType::AtLeast)
+                .line(twips),
+        );
+        self
+    }
+
+    /// 设置段前间距
+    pub fn space_before(&mut self, twips: i32) -> &mut Self {
+        if let Some(ref mut spacing) = self.spacing {
+            *spacing = spacing.clone().before(twips);
+        } else {
+            self.spacing = Some(ParagraphSpacing::new().before(twips));
+        }
+        self
+    }
+
+    /// 设置段后间距
+    pub fn space_after(&mut self, twips: i32) -> &mut Self {
+        if let Some(ref mut spacing) = self.spacing {
+            *spacing = spacing.clone().after(twips);
+        } else {
+            self.spacing = Some(ParagraphSpacing::new().after(twips));
+        }
+        self
+    }
+
     /// 设置框架
     pub fn frame(&mut self, frame: ParagraphFrame) -> &mut Self {
         self.frame = Some(frame);
@@ -1165,6 +1305,9 @@ impl Paragraph {
                                 left_i = indent.left;
                                 right_i = indent.right;
                             }
+                            if let Some(sp) = &paragraph_style.spacing {
+                                paragraph = paragraph.line_spacing(sp.to_docx_line_spacing());
+                            }
                         }
                     }
                 }
@@ -1190,15 +1333,6 @@ impl Paragraph {
             None,
         );
 
-        if let Some(_spacing) = &self.spacing {
-            // 注意：docx-rs 0.4.18-rc44 分支可能不支持 Spacing 类型
-            // 暂时跳过段落间距处理
-
-            // 暂时跳过行间距处理，因为 docx-rs 0.4.18-rc44 分支的 line_spacing 方法可能与我们的实现不兼容
-            // if let Some(line) = spacing.line {
-            //     // 这里需要根据 docx-rs 的 API 进行调整
-            // }
-        }
 
         if let Some(frame) = &self.frame {
             // 应用框架属性
@@ -1280,11 +1414,11 @@ impl Paragraph {
                             lines = lines.max(1);
 
                             let bottom_pos =
-                                page_height - bottom_margin - (line_height * lines as i32);
+                                page_height - bottom_margin - (240 * lines as i32); //标题页固定单倍行距s所以用240（12磅）
 
                             // 使用一个比例因子，将 bottom_pos 转换为更大的值
                             // 这个因子可以根据实际效果进行调整
-                            let scale_factor = 0.85;
+                            let scale_factor = 0.80;
                             let adjusted_pos = (bottom_pos as f32 * scale_factor) as i32;
 
                             paragraph = paragraph.frame_y(adjusted_pos);
@@ -1308,6 +1442,11 @@ impl Paragraph {
 
         for run in &self.runs {
             paragraph = paragraph.add_run(run.to_docx_run(mstyles.clone(), footnotes.clone()));
+        }
+        
+        if let Some(spacing) = &self.spacing {
+            // 应用行距和段落间距设置
+            paragraph = paragraph.line_spacing(spacing.to_docx_line_spacing());
         }
 
         paragraph

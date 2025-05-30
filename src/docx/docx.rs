@@ -348,6 +348,9 @@ pub async fn generate_docx_document(
 
     // 调整底部边距
     print_profile.bottom_margin = ((print_profile.page_height - print_profile.top_margin - (print_profile.lines_per_page as f32 * line_height)) * 100.0).round() / 100.0;
+    
+    println!("【bottom_margin】:");
+    println!("  bottom_margin: {} pt", print_profile.bottom_margin);
 
     // 创建DOCX选项
     let mut docx_options = DocxOptions::default();

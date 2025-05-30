@@ -16,6 +16,8 @@ use crate::docx::adapter::{
     StyleStash, UnderlineTypeConst,
 };
 
+use super::adapter::docx::ParagraphSpacing;
+
 /// DOCX导出错误类型
 #[derive(Error, Debug)]
 pub enum DocxError {
@@ -88,7 +90,7 @@ impl Default for PrintProfile {
             // 基于"中文a4"配置
             font_size: 12.0,
             note_font_size: 9.0,
-            lines_per_page: 30,
+            lines_per_page: 20,
             page_width: 8.27,
             page_height: 11.69,
             font_width: 0.1,
@@ -379,12 +381,6 @@ pub struct DocxContext {
 }
 
 impl DocxContext {
-    /// 添加段落
-    pub fn add_paragraph(&mut self) {
-        let paragraph = crate::docx::adapter::docx::Paragraph::new();
-        self.doc.add_paragraph(paragraph);
-    }
-
     /// 创建新的文档上下文
     pub fn new(options: DocxOptions) -> Self {
         let mut font_names = HashMap::new();
@@ -655,7 +651,7 @@ impl DocxContext {
     }
 
     /// 添加文档样式定义
-    pub fn add_document_styles(&mut self) {
+    pub fn add_document_styles(&mut self, spacing: &ParagraphSpacing) {
         // 获取打印配置
         let print = &self.options.print_profile;
 
@@ -669,16 +665,6 @@ impl DocxContext {
         let dialogue_indent = convert_inches_to_twip(print.dialogue.feed - print.left_margin);
         let parenthetical_indent =
             convert_inches_to_twip(print.parenthetical.feed - print.left_margin);
-
-        // 行间距设置
-        let line_height = (print.page_height - print.top_margin - print.bottom_margin)
-            / print.lines_per_page as f32;
-        let spacing = crate::docx::adapter::docx::ParagraphSpacing {
-            line: Some(convert_inches_to_twip(line_height)),
-            line_rule: Some(crate::docx::adapter::LineRuleType::Exact),
-            before: None,
-            after: None,
-        };
 
         // 创建样式定义
         let mut styles = crate::docx::adapter::docx::Styles::new();
@@ -785,14 +771,8 @@ impl DocxContext {
             left: Some(action_indent),
             right: Some(action_indent),
         });
-        // 注释使用特殊的行间距
-        let note_spacing = crate::docx::adapter::docx::ParagraphSpacing {
-            line: Some(convert_inches_to_twip(print.note_line_height)),
-            line_rule: Some(crate::docx::adapter::LineRuleType::Exact),
-            before: None,
-            after: None,
-        };
-        notes_style.spacing = Some(note_spacing);
+        // 注释使用相同的算法，但基于注释字体大小
+        notes_style.spacing = Some(spacing.clone());
         styles.paragraph_styles.push(notes_style);
 
         // 将样式添加到文档
@@ -804,6 +784,7 @@ impl DocxContext {
         &mut self,
         section_main: &mut crate::docx::adapter::docx::Section,
         print: &PrintProfile,
+        spacing: &ParagraphSpacing,
     ) {
         println!("【finish_double_dial】开始处理双对话，左侧缓存: {}, 右侧缓存: {}, 全局左侧: {}, 全局右侧: {}",
             self.last_dial_gr_left.is_some(), self.last_dial_gr_right.is_some(),
@@ -811,7 +792,8 @@ impl DocxContext {
 
         // 处理左侧对话缓存，添加到全局表格缓存
         if let Some(dial_gr_left) = self.last_dial_gr_left.take() {
-            let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
+            let mut paragraph =
+                crate::docx::adapter::docx::Paragraph::new_with_spacing(spacing.clone());
             paragraph.style(&dial_gr_left.style);
 
             if let Some(left) = dial_gr_left.indent_left {
@@ -830,7 +812,8 @@ impl DocxContext {
 
         // 处理右侧对话缓存，添加到全局表格缓存
         if let Some(dial_gr_right) = self.last_dial_gr_right.take() {
-            let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
+            let mut paragraph =
+                crate::docx::adapter::docx::Paragraph::new_with_spacing(spacing.clone());
             paragraph.style(&dial_gr_right.style);
 
             if let Some(left) = dial_gr_right.indent_left {
@@ -936,7 +919,8 @@ impl DocxContext {
 
             // 如果只有左侧有对话，表格后补一个空行 - 参考原项目逻辑
             if self.last_dial_table_right.is_empty() {
-                let mut empty_paragraph = crate::docx::adapter::docx::Paragraph::new();
+                let mut empty_paragraph =
+                    crate::docx::adapter::docx::Paragraph::new_with_spacing(spacing.clone());
                 empty_paragraph.add_text_run(crate::docx::adapter::docx::TextRun::new(""));
                 section_main
                     .children
@@ -955,10 +939,12 @@ impl DocxContext {
     pub fn finish_china_dial_first(
         &mut self,
         section_main: &mut crate::docx::adapter::docx::Section,
+        spacing: &ParagraphSpacing,
     ) {
         // 处理普通对话缓存
         if let Some(dial_gr) = self.last_dial_gr.take() {
-            let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
+            let mut paragraph =
+                crate::docx::adapter::docx::Paragraph::new_with_spacing(spacing.clone());
             paragraph.style(&dial_gr.style);
 
             if let Some(left) = dial_gr.indent_left {
@@ -982,7 +968,8 @@ impl DocxContext {
         // 处理左侧对话缓存，添加到全局表格缓存 - 修复关键问题
         if let Some(dial_gr_left) = self.last_dial_gr_left.take() {
             println!("【finish_china_dial_first】处理左侧对话缓存，添加到全局表格缓存");
-            let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
+            let mut paragraph =
+                crate::docx::adapter::docx::Paragraph::new_with_spacing(spacing.clone());
             paragraph.style(&dial_gr_left.style);
 
             if let Some(left) = dial_gr_left.indent_left {
@@ -1003,7 +990,8 @@ impl DocxContext {
         // 处理右侧对话缓存，添加到全局表格缓存 - 修复关键问题
         if let Some(dial_gr_right) = self.last_dial_gr_right.take() {
             println!("【finish_china_dial_first】处理右侧对话缓存，添加到全局表格缓存");
-            let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
+            let mut paragraph =
+                crate::docx::adapter::docx::Paragraph::new_with_spacing(spacing.clone());
             paragraph.style(&dial_gr_right.style);
 
             if let Some(left) = dial_gr_right.indent_left {
@@ -1947,14 +1935,18 @@ fn finish_dialogue_processing(
     section_main: &mut crate::docx::adapter::docx::Section,
     section_main_no_page_num: &mut crate::docx::adapter::docx::Section,
     print: &PrintProfile,
+    spacing: &ParagraphSpacing,
 ) {
     // 完成中文格式对话处理
     if china_format > 0 {
-        doc.finish_china_dial_first(if scene_or_section_or_tran_started {
-            section_main
-        } else {
-            section_main_no_page_num
-        });
+        doc.finish_china_dial_first(
+            if scene_or_section_or_tran_started {
+                section_main
+            } else {
+                section_main_no_page_num
+            },
+            spacing,
+        );
     }
 
     // 检查是否需要完成双对话处理
@@ -1976,6 +1968,7 @@ fn finish_dialogue_processing(
                 section_main_no_page_num
             },
             print,
+            spacing,
         );
     }
 }
@@ -2144,7 +2137,11 @@ pub fn generate(
                 convert_inches_to_twip(print.bottom_margin),
                 convert_inches_to_twip(print.left_margin),
                 convert_inches_to_twip(print.page_number_top_margin),
-                convert_inches_to_twip(print.page_number_top_margin - line_height),
+                convert_inches_to_twip(if (print.page_number_top_margin - line_height < 0.2) {
+                    0.2
+                } else {
+                    print.page_number_top_margin - line_height
+                }),
             )),
             page_numbers: Some(crate::docx::adapter::docx::PageNumbers::new(1)),
         }),
@@ -2344,9 +2341,36 @@ pub fn generate(
     let action_indent = convert_inches_to_twip(print.action.feed - print.left_margin);
     let shot_cut_indent = action_indent - convert_inches_to_twip(4.0 * print.font_width); // 镜头交切标志缩进
 
-    // 添加样式定义
-    doc.add_document_styles();
+    // 行间距设置 - 使用合理的固定行距
+    // 问题根源：options.line_height 基于 lines_per_page=20 计算，产生过大的行距 (451 twips = 1.9倍)
+    // 解决方案：使用基于字体大小的合理倍数，而不是页面布局计算的动态行距
+    let line_spacing_twips = convert_inches_to_twip(options.line_height); // 转换为 twips (1pt = 20 twips)
 
+    println!("【行距设置日志】正文样式 - 使用合理的固定行距:");
+    println!("  字体大小: {} pt", print.font_size);
+    println!("  行距倍数: 1.2 (120%)");
+    println!("  转换为 twips: {} twips", line_spacing_twips);
+    println!(
+        "  相对单倍行距: {:.1} 倍",
+        line_spacing_twips as f32 / 240.0
+    );
+    println!(
+        "  (避免使用页面布局的 options.line_height = {} 英寸 = {} twips)",
+        options.line_height,
+        convert_inches_to_twip(options.line_height)
+    );
+
+    let spacing = crate::docx::adapter::docx::ParagraphSpacing {
+        line: Some(line_spacing_twips), // 276 twips (1.15倍单倍行距)
+        line_rule: Some(crate::docx::adapter::LineRuleType::Exact), // 使用精确行距
+        before: None,
+        after: None,
+        before_lines: None,
+        after_lines: None,
+    };
+
+    // 添加样式定义
+    doc.add_document_styles(&spacing);
 
     // 预计算常用的选项映射（避免重复创建）
     let default_text_options = create_basic_options_map("#000000");
@@ -2511,6 +2535,7 @@ pub fn generate(
                     &mut section_main,
                     &mut section_main_no_page_num,
                     &print,
+                    &spacing,
                 );
 
                 if !scene_or_section_or_tran_started {
@@ -2524,7 +2549,8 @@ pub fn generate(
                 current_scene = line.text.clone();
 
                 // 创建段落
-                let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
+                let mut paragraph =
+                    crate::docx::adapter::docx::Paragraph::new_with_spacing(spacing.clone());
                 paragraph.style("scene");
 
                 // 设置缩进
@@ -2573,7 +2599,7 @@ pub fn generate(
                     text = add_tag_after_broken_note(text, style_chars["underline"].to_string())
                         + &style_chars["underline"].to_string();
                 }
-                
+
                 text = if_reset_format(text, line);
 
                 // 创建文本运行
@@ -2619,10 +2645,12 @@ pub fn generate(
                     &mut section_main,
                     &mut section_main_no_page_num,
                     &print,
+                    &spacing,
                 );
 
                 // 创建段落
-                let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
+                let mut paragraph =
+                    crate::docx::adapter::docx::Paragraph::new_with_spacing(spacing.clone());
                 paragraph.style("action");
 
                 // 设置缩进
@@ -2677,10 +2705,12 @@ pub fn generate(
                     &mut section_main,
                     &mut section_main_no_page_num,
                     &print,
+                    &spacing,
                 );
-                
+
                 // 创建段落
-                let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
+                let mut paragraph =
+                    crate::docx::adapter::docx::Paragraph::new_with_spacing(spacing.clone());
                 paragraph.style("action");
 
                 // 设置缩进
@@ -2731,6 +2761,7 @@ pub fn generate(
                     &mut section_main,
                     &mut section_main_no_page_num,
                     &print,
+                    &spacing,
                 );
 
                 // 处理 synopsis - 参考原项目逻辑
@@ -2750,7 +2781,8 @@ pub fn generate(
                 let section_indent = convert_inches_to_twip(feed - print.action.feed);
 
                 // 创建段落
-                let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
+                let mut paragraph =
+                    crate::docx::adapter::docx::Paragraph::new_with_spacing(spacing.clone());
                 paragraph.style("action"); // synopsis 使用 action 样式
 
                 // 设置左右缩进
@@ -2811,13 +2843,13 @@ pub fn generate(
                                 &mut section_main_no_page_num
                             },
                             &print,
+                            &spacing,
                         );
                     }
                 }
 
                 // 处理文本
                 let mut text = line.text.clone();
-                
 
                 // 处理角色名
                 if line.token_type == "character" {
@@ -2844,17 +2876,20 @@ pub fn generate(
                     // 中文格式处理
                     if china_format > 0 {
                         // 先完成之前的缓存对话
-                        doc.finish_china_dial_first(if scene_or_section_or_tran_started {
-                            &mut section_main
-                        } else {
-                            &mut section_main_no_page_num
-                        });
+                        doc.finish_china_dial_first(
+                            if scene_or_section_or_tran_started {
+                                &mut section_main
+                            } else {
+                                &mut section_main_no_page_num
+                            },
+                            &spacing,
+                        );
 
                         // 添加冒号
                         text = format!("{}: ", text);
                     }
                 }
-                
+
                 text = if_reset_format(text, line);
 
                 // 创建文本运行
@@ -2910,7 +2945,10 @@ pub fn generate(
                                 dial_gr_left.children.extend(text_runs);
                             } else {
                                 // 如果没有缓存的左侧角色名，直接添加到表格 - 参考原项目逻辑
-                                let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
+                                let mut paragraph =
+                                    crate::docx::adapter::docx::Paragraph::new_with_spacing(
+                                        spacing.clone(),
+                                    );
                                 paragraph.style("dial");
                                 paragraph.indent(dial_indent_out);
                                 paragraph.indent_right(dial_indent_in);
@@ -2931,7 +2969,10 @@ pub fn generate(
                                 dial_gr_right.children.extend(text_runs);
                             } else {
                                 // 如果没有缓存的右侧角色名，直接添加到表格 - 参考原项目逻辑
-                                let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
+                                let mut paragraph =
+                                    crate::docx::adapter::docx::Paragraph::new_with_spacing(
+                                        spacing.clone(),
+                                    );
                                 paragraph.style("dial");
                                 paragraph.indent(dial_indent_in);
                                 paragraph.indent_right(dial_indent_out);
@@ -2952,7 +2993,10 @@ pub fn generate(
                                 dial_gr.children.extend(text_runs);
                             } else {
                                 // 如果没有缓存的角色名，直接输出
-                                let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
+                                let mut paragraph =
+                                    crate::docx::adapter::docx::Paragraph::new_with_spacing(
+                                        spacing.clone(),
+                                    );
                                 paragraph.style("action");
 
                                 for run in text_runs {
@@ -2986,7 +3030,9 @@ pub fn generate(
                                     // 立即输出并清空缓存 - 参考原项目逻辑
                                     let cached_group = doc.last_dial_gr_left.clone().unwrap();
                                     let mut paragraph =
-                                        crate::docx::adapter::docx::Paragraph::new();
+                                        crate::docx::adapter::docx::Paragraph::new_with_spacing(
+                                            spacing.clone(),
+                                        );
                                     paragraph.style(&cached_group.style);
 
                                     if let Some(left) = cached_group.indent_left {
@@ -3010,7 +3056,10 @@ pub fn generate(
                                 // china_format == 3 || china_format == 4 时继续缓存，等待更多对白
                             } else {
                                 // 如果没有缓存的左侧角色名，直接输出到全局表格缓存
-                                let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
+                                let mut paragraph =
+                                    crate::docx::adapter::docx::Paragraph::new_with_spacing(
+                                        spacing.clone(),
+                                    );
                                 paragraph.style("dial");
                                 paragraph.indent(dial_indent_out);
                                 paragraph.indent_right(dial_indent_in);
@@ -3035,7 +3084,9 @@ pub fn generate(
                                     // 立即输出并清空缓存 - 参考原项目逻辑
                                     let cached_group = doc.last_dial_gr_right.clone().unwrap();
                                     let mut paragraph =
-                                        crate::docx::adapter::docx::Paragraph::new();
+                                        crate::docx::adapter::docx::Paragraph::new_with_spacing(
+                                            spacing.clone(),
+                                        );
                                     paragraph.style(&cached_group.style);
 
                                     if let Some(left) = cached_group.indent_left {
@@ -3059,7 +3110,10 @@ pub fn generate(
                                 // china_format == 3 || china_format == 4 时继续缓存，等待更多对白
                             } else {
                                 // 如果没有缓存的右侧角色名，直接输出到全局表格缓存
-                                let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
+                                let mut paragraph =
+                                    crate::docx::adapter::docx::Paragraph::new_with_spacing(
+                                        spacing.clone(),
+                                    );
                                 paragraph.style("dial");
                                 paragraph.indent(dial_indent_in);
                                 paragraph.indent_right(dial_indent_out);
@@ -3084,7 +3138,9 @@ pub fn generate(
                                     // 立即输出并清空缓存
                                     let cached_group = doc.last_dial_gr.take().unwrap();
                                     let mut paragraph =
-                                        crate::docx::adapter::docx::Paragraph::new();
+                                        crate::docx::adapter::docx::Paragraph::new_with_spacing(
+                                            spacing.clone(),
+                                        );
                                     paragraph.style(&cached_group.style);
 
                                     for run in cached_group.children {
@@ -3109,7 +3165,10 @@ pub fn generate(
                             } else {
                                 // 如果没有缓存的角色名，直接输出
                                 // 在 china_format 下，没有缓存的对白使用 "action" 样式，不设置特殊缩进
-                                let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
+                                let mut paragraph =
+                                    crate::docx::adapter::docx::Paragraph::new_with_spacing(
+                                        spacing.clone(),
+                                    );
                                 paragraph.style("action");
 
                                 for run in text_runs {
@@ -3139,7 +3198,9 @@ pub fn generate(
                         // 双对话：添加到全局表格缓存
                         println!("【generate】国际格式双对话: {} - {}", line.token_type, text);
 
-                        let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
+                        let mut paragraph = crate::docx::adapter::docx::Paragraph::new_with_spacing(
+                            spacing.clone(),
+                        );
 
                         if line.token_type == "dialogue" {
                             paragraph.style("dial");
@@ -3184,7 +3245,9 @@ pub fn generate(
                         }
                     } else {
                         // 普通单对话：直接输出
-                        let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
+                        let mut paragraph = crate::docx::adapter::docx::Paragraph::new_with_spacing(
+                            spacing.clone(),
+                        );
 
                         if line.token_type == "dialogue" {
                             paragraph.style("dial");
@@ -3241,6 +3304,7 @@ pub fn generate(
                     &mut section_main,
                     &mut section_main_no_page_num,
                     &print,
+                    &spacing,
                 );
 
                 if !scene_or_section_or_tran_started {
@@ -3265,7 +3329,8 @@ pub fn generate(
                 }
 
                 // 创建段落
-                let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
+                let mut paragraph =
+                    crate::docx::adapter::docx::Paragraph::new_with_spacing(spacing.clone());
                 paragraph.style("section");
 
                 // 计算章节缩进 - 参考原项目使用 current_section_level
@@ -3331,6 +3396,7 @@ pub fn generate(
                     &mut section_main,
                     &mut section_main_no_page_num,
                     &print,
+                    &spacing,
                 );
 
                 if !scene_or_section_or_tran_started {
@@ -3367,19 +3433,15 @@ pub fn generate(
                 }
 
                 // 创建段落
-                let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
+                let mut paragraph =
+                    crate::docx::adapter::docx::Paragraph::new_with_spacing(spacing.clone());
                 paragraph.style(style);
 
                 // 设置缩进
                 paragraph.indent(indent);
 
-                // 设置行间距
-                paragraph.spacing(crate::docx::adapter::docx::ParagraphSpacing {
-                    line: Some(convert_inches_to_twip(line_height)),
-                    line_rule: Some(crate::docx::adapter::LineRuleType::Exact),
-                    before: None,
-                    after: None,
-                });
+                // 设置行间距 - 使用行高减去字体大小的算法
+                let final_line_spacing_twips = convert_inches_to_twip(options.line_height);
 
                 // 处理转场对齐
                 if is_shot_cut {
@@ -3402,7 +3464,7 @@ pub fn generate(
                 if is_shot_cut {
                     transition_options.insert("bold".to_string(), "true".to_string());
                 }
-                
+
                 text = if_reset_format(text, line);
 
                 let text_runs = doc.text2(
@@ -3444,6 +3506,7 @@ pub fn generate(
                     &mut section_main,
                     &mut section_main_no_page_num,
                     &print,
+                    &spacing,
                 );
 
                 // 更新页码
@@ -3472,22 +3535,16 @@ pub fn generate(
                     &mut section_main,
                     &mut section_main_no_page_num,
                     &print,
+                    &spacing,
                 );
 
                 // 处理其他类型的token
-                let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
+                let mut paragraph =
+                    crate::docx::adapter::docx::Paragraph::new_with_spacing(spacing.clone());
                 paragraph.style("action");
 
                 // 设置缩进
                 paragraph.indent(action_indent);
-
-                // 设置行间距
-                paragraph.spacing(crate::docx::adapter::docx::ParagraphSpacing {
-                    line: Some(convert_inches_to_twip(line_height)),
-                    line_rule: Some(crate::docx::adapter::LineRuleType::Exact),
-                    before: None,
-                    after: None,
-                });
 
                 // 创建文本运行
                 let text_runs = doc.text2(
@@ -3544,6 +3601,7 @@ pub fn generate(
         &mut section_main,
         &mut section_main_no_page_num,
         &print,
+        &spacing,
     );
 
     // 处理脚注 - 参考原项目 docxmaker.ts 中的脚注处理逻辑
@@ -3589,7 +3647,8 @@ pub fn generate(
 
                     // 创建脚注段落
                     let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
-                    paragraph.style("notes");
+                    // let mut paragraph = crate::docx::adapter::docx::Paragraph::new_with_spacing(spacing.clone());
+                    // paragraph.style("notes");
 
                     // 创建文本运行 - 参考原项目使用固定颜色 #868686
                     let mut footnote_options = create_basic_options_map("#868686");
@@ -3643,7 +3702,7 @@ pub fn generate(
     // 在 TypeScript 版本中，section 属性是通过 sesctionProps 设置的
     // 在 Rust 版本中，section 属性是通过 doc.doc.set_section_properties 设置的
     // 但是，我们仍然需要记录 line_height 的使用，以便与 TypeScript 版本保持一致
-    let _footer_margin = convert_inches_to_twip(print.page_number_top_margin - line_height);
+    let _footer_margin = convert_inches_to_twip(print.page_number_top_margin - options.line_height);
 
     // 在 Rust 版本中，我们不使用 sections 的方式来组织文档
     // 但是，我们仍然需要记录 print_preface_page 的使用，以便与 TypeScript 版本保持一致
