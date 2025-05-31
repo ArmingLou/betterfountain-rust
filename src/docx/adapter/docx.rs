@@ -1687,7 +1687,7 @@ impl RunTrait for TextRun {
             // 创建带有脚注引用的运行
             return docx_rs::Run::new().add_footnote_reference_with_size(
                 footnote,
-                (self.props.size.unwrap_or(12) as f64 * 2.0 * 1.3) as usize, // 适配，字体磅数都要*2 ，比如实际的12磅实际传入参数需要24
+                (self.props.size.unwrap_or(9) as f64 * 2.0 * 1.9) as usize, // 适配，字体磅数都要*2 ，比如实际的12磅实际传入参数需要24
             );
         }
 
