@@ -1391,9 +1391,19 @@ impl Paragraph {
                     }
                     VerticalPositionAlign::Center => {
                         // 居中对齐，使用基础偏移确保独立性
-                        paragraph = paragraph.frame_y(5000);
+                        // paragraph = paragraph.frame_y(0);
+                        // if let (Some(page_height), Some(bottom_margin), Some(line_height)) =
+                        //     (frame.page_height, frame.bottom_margin, frame.line_height)
+                        // {
+                        //     paragraph = paragraph.frame_height((page_height-bottom_margin-bottom_margin)as u32)
+                        // }
+                        paragraph = paragraph.y_align(docx_rs::AlignmentType::Center.to_string());
+                        // paragraph = paragraph.align(docx_rs::AlignmentType::Center);
                     }
                     VerticalPositionAlign::Bottom => {
+                        paragraph = paragraph.y_align("bottom".to_string());
+                        
+                        
                         // 底部对齐
                         // 尝试使用更大的值来实现底部对齐
                         // 在 docx-rs 中，frame_y 的值范围是 0-9999
@@ -1401,53 +1411,55 @@ impl Paragraph {
 
                         // 如果页面高度和底部边距信息可用，尝试使用它们来计算
                         // 一个更精确的底部位置
-                        if let (Some(page_height), Some(bottom_margin), Some(line_height)) =
-                            (frame.page_height, frame.bottom_margin, frame.line_height)
-                        {
-                            // 动态计算段落的行数
-                            let mut lines = 1; // 至少有一行
+                        // if let (Some(page_height), Some(bottom_margin), Some(line_height)) =
+                        //     (frame.page_height, frame.bottom_margin, frame.line_height)
+                        // {
+                        //     // 动态计算段落的行数
+                        //     let mut lines = 1; // 至少有一行
 
-                            // 遍历所有文本运行，计算换行符数量
-                            for run in &self.runs {
-                                if let RunType::Text(text_run) = run {
-                                    // 计算文本中的换行符数量
-                                    let line_breaks = text_run.text.matches('\n').count();
-                                    lines += line_breaks;
+                        //     // 遍历所有文本运行，计算换行符数量
+                        //     for run in &self.runs {
+                        //         if let RunType::Text(text_run) = run {
+                        //             // 计算文本中的换行符数量
+                        //             let line_breaks = text_run.text.matches('\n').count();
+                        //             lines += line_breaks;
 
-                                    // 如果设置了 break_before，则增加一行
-                                    if text_run.break_before {
-                                        lines += 1;
-                                    }
+                        //             // 如果设置了 break_before，则增加一行
+                        //             if text_run.break_before {
+                        //                 lines += 1;
+                        //             }
 
-                                    // 如果 RunProps 中设置了 break_before，则增加一行
-                                    if let Some(true) = text_run.props.break_before {
-                                        lines += 1;
-                                    }
+                        //             // 如果 RunProps 中设置了 break_before，则增加一行
+                        //             if let Some(true) = text_run.props.break_before {
+                        //                 lines += 1;
+                        //             }
 
-                                    // 如果设置了 break_type，则增加一行
-                                    if text_run.props.break_type.is_some() {
-                                        lines += 1;
-                                    }
-                                }
-                            }
+                        //             // 如果设置了 break_type，则增加一行
+                        //             if text_run.props.break_type.is_some() {
+                        //                 lines += 1;
+                        //             }
+                        //         }
+                        //     }
 
-                            // 确保至少有一行
-                            lines = lines.max(1);
+                        //     // 确保至少有一行
+                        //     lines = lines.max(1);
 
-                            // 使用一个比例因子，将 bottom_pos 转换为更大的值
-                            // 这个因子可以根据实际效果进行调整
-                            let scale_factor = 0.89;
-                            let scale_factor2 = 1.89; // 另一个比例因子，单独作用于行数
-                            let bottom_pos = (((page_height - bottom_margin) as f32) * scale_factor
-                                - (line_height as f32 * scale_factor2 * lines as f32))
-                                as i32;
+                        //     // 使用一个比例因子，将 bottom_pos 转换为更大的值
+                        //     // 这个因子可以根据实际效果进行调整
+                        //     let scale_factor = 0.89;
+                        //     let scale_factor2 = 1.89; // 另一个比例因子，单独作用于行数
+                        //     let bottom_pos = (((page_height - bottom_margin) as f32) * scale_factor
+                        //         - (line_height as f32 * scale_factor2 * lines as f32))
+                        //         as i32;
 
-                            paragraph = paragraph.frame_y(bottom_pos);
-                        } else {
-                            // 如果没有提供页面信息，则使用一个非常大的值
-                            // 这个值可以根据实际效果进行调整
-                            paragraph = paragraph.frame_y(20000);
-                        }
+                        //     paragraph = paragraph.frame_y(bottom_pos);
+                            
+                            
+                        // } else {
+                        //     // 如果没有提供页面信息，则使用一个非常大的值
+                        //     // 这个值可以根据实际效果进行调整
+                        //     paragraph = paragraph.frame_y(20000);
+                        // }
                     }
                     _ => {}
                 }
