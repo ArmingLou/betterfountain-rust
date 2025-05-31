@@ -1339,6 +1339,9 @@ impl Paragraph {
         );
 
         if let Some(frame) = &self.frame {
+            
+            paragraph = paragraph.add_run(docx_rs::Run::new().add_break(docx_rs::BreakType::TextWrapping)); //j加个换行才能让宽度伸展到全页，然后右对齐才有效果
+            
             // 应用框架属性
             if let Some(width) = frame.width {
                 // 设置框架宽度
@@ -1346,35 +1349,58 @@ impl Paragraph {
                 paragraph = paragraph.size(width as usize);
             }
 
+            // 根据锚点类型和对齐方式设置不同的水平位置偏移，确保 frame 独立
+            let x_offset = match (&frame.anchor_horizontal, &frame.x_align) {
+                (Some(crate::docx::adapter::FrameAnchorType::Page), Some(HorizontalPositionAlign::Left)) => 0,
+                (Some(crate::docx::adapter::FrameAnchorType::Margin), Some(HorizontalPositionAlign::Center)) => 1,
+                (Some(crate::docx::adapter::FrameAnchorType::Text), Some(HorizontalPositionAlign::Right)) => 2,
+                (Some(crate::docx::adapter::FrameAnchorType::Page), Some(HorizontalPositionAlign::Center)) => 3,
+                (Some(crate::docx::adapter::FrameAnchorType::Margin), Some(HorizontalPositionAlign::Left)) => 4,
+                (Some(crate::docx::adapter::FrameAnchorType::Text), Some(HorizontalPositionAlign::Left)) => 5,
+                _ => 0,
+            };
+
             // 设置水平位置
             if let Some(x_align) = &frame.x_align {
                 match x_align {
                     HorizontalPositionAlign::Left => {
-                        // 左对齐，使用 0 表示左边缘
-                        paragraph = paragraph.frame_x(0);
+                        // 左对齐，使用微小偏移确保独立性
+                        paragraph = paragraph.frame_x(x_offset);
                     }
                     HorizontalPositionAlign::Center => {
-                        // 居中对齐，使用 0 表示居中（依赖于段落的居中对齐）
-                        paragraph = paragraph.frame_x(0);
+                        // 居中对齐，使用微小偏移确保独立性
+                        paragraph = paragraph.frame_x(x_offset);
                     }
                     HorizontalPositionAlign::Right => {
-                        // 右对齐，使用 0 表示右边缘（依赖于段落的右对齐）
-                        paragraph = paragraph.frame_x(0);
+                        // 右对齐，使用微小偏移确保独立性
+                        paragraph = paragraph.frame_x(x_offset);
+                        
                     }
                     _ => {}
                 }
             }
 
+            // 根据锚点类型和对齐方式设置不同的垂直位置偏移，确保 frame 独立
+            let y_base_offset = match (&frame.anchor_vertical, &frame.y_align) {
+                (Some(crate::docx::adapter::FrameAnchorType::Page), Some(VerticalPositionAlign::Top)) => -240,
+                (Some(crate::docx::adapter::FrameAnchorType::Margin), Some(VerticalPositionAlign::Top)) => -239,
+                (Some(crate::docx::adapter::FrameAnchorType::Text), Some(VerticalPositionAlign::Top)) => -238,
+                (Some(crate::docx::adapter::FrameAnchorType::Page), Some(VerticalPositionAlign::Center)) => 5000-240,
+                (Some(crate::docx::adapter::FrameAnchorType::Margin), Some(VerticalPositionAlign::Center)) => 5001-240,
+                (Some(crate::docx::adapter::FrameAnchorType::Text), Some(VerticalPositionAlign::Center)) => 5002-240,
+                _ => -240,
+            };
+
             // 设置垂直位置
             if let Some(y_align) = &frame.y_align {
                 match y_align {
                     VerticalPositionAlign::Top => {
-                        // 顶部对齐，使用 0 表示顶部
-                        paragraph = paragraph.frame_y(0);
+                        // 顶部对齐，使用基础偏移确保独立性
+                        paragraph = paragraph.frame_y(y_base_offset);
                     }
                     VerticalPositionAlign::Center => {
-                        // 居中对齐，使用 5000 表示居中（docx 中的标准值）
-                        paragraph = paragraph.frame_y(5000);
+                        // 居中对齐，使用基础偏移确保独立性
+                        paragraph = paragraph.frame_y(y_base_offset);
                     }
                     VerticalPositionAlign::Bottom => {
                         // 底部对齐
@@ -1417,15 +1443,15 @@ impl Paragraph {
                             // 确保至少有一行
                             lines = lines.max(1);
 
-                            let bottom_pos =
-                                page_height - bottom_margin - (line_height * lines as i32);
-
                             // 使用一个比例因子，将 bottom_pos 转换为更大的值
                             // 这个因子可以根据实际效果进行调整
-                            let scale_factor = 0.80;
-                            let adjusted_pos = (bottom_pos as f32 * scale_factor) as i32;
+                            let scale_factor = 0.89;
+                            let scale_factor2 = 1.89; // 另一个比例因子，单独作用于行数
+                            let bottom_pos = (((page_height - bottom_margin - 240) as f32) * scale_factor
+                                - (line_height as f32 * scale_factor2 * lines as f32))
+                                as i32; // -240 是因为所有位置都前置加了空行
 
-                            paragraph = paragraph.frame_y(adjusted_pos);
+                            paragraph = paragraph.frame_y(bottom_pos);
                         } else {
                             // 如果没有提供页面信息，则使用一个非常大的值
                             // 这个值可以根据实际效果进行调整
@@ -1527,7 +1553,11 @@ impl TextRun {
     }
 
     /// 创建脚注引用运行
-    pub fn footnote_reference(footnote_id: usize, footnote_content: Vec<Paragraph>, props: RunProps) -> Self {
+    pub fn footnote_reference(
+        footnote_id: usize,
+        footnote_content: Vec<Paragraph>,
+        props: RunProps,
+    ) -> Self {
         Self {
             text: format!("[{}]", footnote_id), // 显示脚注编号
             props: props,
@@ -1644,7 +1674,8 @@ impl RunTrait for TextRun {
                         // 克隆并插入脚注编号
                         let mut pg_with_no = pg.clone();
                         pg_with_no.add_run_before(RunType::Text(TextRun::with_props(
-                            format!("[{}] ", footnote_id).as_str(), self.props.clone().color("#000000")
+                            format!("[{}] ", footnote_id).as_str(),
+                            self.props.clone().color("#000000"),
                         )));
                         footnote = footnote.add_content(
                             pg_with_no.to_docx_paragraph(mstyles.clone(), footnotes.clone()),
@@ -1670,7 +1701,8 @@ impl RunTrait for TextRun {
                             // 克隆并插入脚注编号
                             let mut pg_with_no = pg.clone();
                             pg_with_no.add_run_before(RunType::Text(TextRun::with_props(
-                                format!("[{}] ", footnote_id).as_str(), self.props.clone().color("#000000")
+                                format!("[{}] ", footnote_id).as_str(),
+                                self.props.clone().color("#000000"),
                             )));
                             footnote = footnote.add_content(
                                 pg_with_no.to_docx_paragraph(mstyles.clone(), footnotes.clone()),
@@ -1717,7 +1749,7 @@ impl RunTrait for TextRun {
         }
 
         if let Some(size) = self.props.size {
-            run = run.size(size*2);// 适配，字体磅数都要*2 ，比如实际的12磅实际传入参数需要24
+            run = run.size(size * 2); // 适配，字体磅数都要*2 ，比如实际的12磅实际传入参数需要24
         }
 
         if let Some(font) = &self.props.font {

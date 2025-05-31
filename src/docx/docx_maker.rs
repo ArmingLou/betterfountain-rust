@@ -12,8 +12,8 @@ use thiserror::Error;
 // 使用适配器中的类型
 use crate::docx::adapter::docx::{Document, TextRun};
 use crate::docx::adapter::{
-    convert_inches_to_twip, convert_point_to_inches, DocxAdapterError, DocxAsBase64, DocxStats, LineStruct, RunProps,
-    StyleStash, UnderlineTypeConst,
+    convert_inches_to_twip, convert_point_to_inches, DocxAdapterError, DocxAsBase64, DocxStats,
+    LineStruct, RunProps, StyleStash, UnderlineTypeConst,
 };
 
 use super::adapter::docx::ParagraphSpacing;
@@ -1532,14 +1532,14 @@ impl DocxContext {
                     // 只有当 draw = true 时才处理文本
                     if draw {
                         let mut font_size = if let Some(font_size) = options.get("fontSize") {
-                            font_size.parse::<usize>().unwrap_or(12) 
+                            font_size.parse::<usize>().unwrap_or(12)
                         } else {
-                            (self.options.print_profile.font_size ) as usize
+                            (self.options.print_profile.font_size) as usize
                         };
 
                         // 参考原项目逻辑：如果在脚注中（override_color存在），使用脚注字体大小
                         if self.format_state.override_color.is_some() {
-                            font_size = (self.options.print_profile.note_font_size ) as usize;
+                            font_size = (self.options.print_profile.note_font_size) as usize;
                         }
 
                         // 检查 options 中的粗体设置
@@ -1559,7 +1559,8 @@ impl DocxContext {
                             self.run_bold.clone()
                         } else if self.format_state.italic
                             || self.options.italic_global
-                            || self.options.italic_dynamic || options_italic
+                            || self.options.italic_dynamic
+                            || options_italic
                         {
                             // 斜体状态：使用 run_italic
                             self.run_italic.clone()
@@ -1822,17 +1823,19 @@ fn calculate_page_dimensions(print: &PrintProfile, line_height: f32) -> PageDime
     }
 }
 
-/// 创建标题页框架配置
+/// 创建标题页框架配置 - 支持独立重叠的 frame
+/// 通过使用不同的锚点和微小的位置偏移来确保每个 frame 真正独立
 fn create_title_frame(
     position: &str,
     dimensions: &PageDimensions,
 ) -> crate::docx::adapter::ParagraphFrame {
     match position {
         "tl" => crate::docx::adapter::ParagraphFrame {
-            width: Some(dimensions.inner_width / 3),
+            // 左上角：使用页面锚点，确保独立性
+            width: Some(dimensions.inner_width),
             height: Some(0),
-            anchor_horizontal: Some(crate::docx::adapter::FrameAnchorType::Margin),
-            anchor_vertical: Some(crate::docx::adapter::FrameAnchorType::Margin),
+            anchor_horizontal: Some(crate::docx::adapter::FrameAnchorType::Page),
+            anchor_vertical: Some(crate::docx::adapter::FrameAnchorType::Page),
             x_align: Some(crate::docx::adapter::HorizontalPositionAlign::Left),
             y_align: Some(crate::docx::adapter::VerticalPositionAlign::Top),
             page_height: Some(dimensions.page_height),
@@ -1841,7 +1844,8 @@ fn create_title_frame(
             line_height: Some(dimensions.line_height),
         },
         "tc" => crate::docx::adapter::ParagraphFrame {
-            width: Some(dimensions.inner_width / 3),
+            // 顶部中央：使用边距锚点，与 tl 区分
+            width: Some(dimensions.inner_width),
             height: Some(0),
             anchor_horizontal: Some(crate::docx::adapter::FrameAnchorType::Margin),
             anchor_vertical: Some(crate::docx::adapter::FrameAnchorType::Margin),
@@ -1853,10 +1857,11 @@ fn create_title_frame(
             line_height: Some(dimensions.line_height),
         },
         "tr" => crate::docx::adapter::ParagraphFrame {
-            width: Some(dimensions.inner_width / 3),
+            // 右上角：使用文本锚点，与 tl 和 tc 区分
+            width: Some(dimensions.inner_width),
             height: Some(0),
-            anchor_horizontal: Some(crate::docx::adapter::FrameAnchorType::Margin),
-            anchor_vertical: Some(crate::docx::adapter::FrameAnchorType::Margin),
+            anchor_horizontal: Some(crate::docx::adapter::FrameAnchorType::Text),
+            anchor_vertical: Some(crate::docx::adapter::FrameAnchorType::Text),
             x_align: Some(crate::docx::adapter::HorizontalPositionAlign::Right),
             y_align: Some(crate::docx::adapter::VerticalPositionAlign::Top),
             page_height: Some(dimensions.page_height),
@@ -1865,10 +1870,11 @@ fn create_title_frame(
             line_height: Some(dimensions.line_height),
         },
         "cc" => crate::docx::adapter::ParagraphFrame {
+            // 中央：使用页面锚点，独立于其他位置
             width: Some(dimensions.inner_width),
             height: Some(0),
-            anchor_horizontal: Some(crate::docx::adapter::FrameAnchorType::Margin),
-            anchor_vertical: Some(crate::docx::adapter::FrameAnchorType::Margin),
+            anchor_horizontal: Some(crate::docx::adapter::FrameAnchorType::Page),
+            anchor_vertical: Some(crate::docx::adapter::FrameAnchorType::Page),
             x_align: Some(crate::docx::adapter::HorizontalPositionAlign::Center),
             y_align: Some(crate::docx::adapter::VerticalPositionAlign::Center),
             page_height: Some(dimensions.page_height),
@@ -1877,10 +1883,11 @@ fn create_title_frame(
             line_height: Some(dimensions.line_height),
         },
         "bl" => crate::docx::adapter::ParagraphFrame {
-            width: Some(dimensions.inner_width / 2),
+            // 左下角：使用边距锚点，与 br 区分
+            width: Some(dimensions.inner_width),
             height: Some(0),
-            anchor_horizontal: Some(crate::docx::adapter::FrameAnchorType::Page),
-            anchor_vertical: Some(crate::docx::adapter::FrameAnchorType::Page),
+            anchor_horizontal: Some(crate::docx::adapter::FrameAnchorType::Margin),
+            anchor_vertical: Some(crate::docx::adapter::FrameAnchorType::Margin),
             x_align: Some(crate::docx::adapter::HorizontalPositionAlign::Left),
             y_align: Some(crate::docx::adapter::VerticalPositionAlign::Bottom),
             page_height: Some(dimensions.page_height),
@@ -1889,10 +1896,11 @@ fn create_title_frame(
             line_height: Some(dimensions.line_height),
         },
         "br" => crate::docx::adapter::ParagraphFrame {
-            width: Some(dimensions.inner_width / 2),
+            // 右下角：使用文本锚点，与 bl 区分
+            width: Some(dimensions.inner_width),
             height: Some(0),
-            anchor_horizontal: Some(crate::docx::adapter::FrameAnchorType::Page),
-            anchor_vertical: Some(crate::docx::adapter::FrameAnchorType::Page),
+            anchor_horizontal: Some(crate::docx::adapter::FrameAnchorType::Text),
+            anchor_vertical: Some(crate::docx::adapter::FrameAnchorType::Text),
             x_align: Some(crate::docx::adapter::HorizontalPositionAlign::Right),
             y_align: Some(crate::docx::adapter::VerticalPositionAlign::Bottom),
             page_height: Some(dimensions.page_height),
@@ -2185,7 +2193,7 @@ pub fn generate(
             title_section.properties = section_props.clone();
 
             // 计算页面尺寸（一次性计算，避免重复）
-            let dimensions = calculate_page_dimensions(print, convert_point_to_inches(12.0));//标题页固定单倍行距s所以用240twip（12磅）,参数传入的单位需要的是 英寸
+            let dimensions = calculate_page_dimensions(print, convert_point_to_inches(12.0)); //标题页固定单倍行距s所以用240twip（12磅）,参数传入的单位需要的是 英寸
 
             // 处理标题页内容（按固定顺序：tl | tc | tr | cc | bl | br）
             for key in ["tl", "tc", "tr", "cc", "bl", "br"] {
@@ -2198,7 +2206,13 @@ pub fn generate(
                     if !tokens.is_empty() {
                         // 按索引排序并连接文本
                         let mut sorted_tokens = tokens.clone();
-                        sorted_tokens.sort_by(|a, b| a.index.cmp(&b.index));
+                        sorted_tokens.sort_by(|a, b| {
+                            if a.index == -1 {
+                                std::cmp::Ordering::Equal
+                            } else {
+                                a.index.cmp(&b.index)
+                            }
+                        });
 
                         let mut text = String::new();
                         for token in sorted_tokens {
@@ -2793,13 +2807,13 @@ pub fn generate(
                 // 设置左右缩进
                 paragraph.indent(section_indent);
                 paragraph.indent_right(section_indent);
-                
+
                 let mut synopsis_options = if let Some(color) = print.synopsis.color.as_ref() {
                     create_basic_options_map(color)
                 } else {
                     default_text_options.clone()
                 };
-                
+
                 if print.synopsis.italic {
                     synopsis_options.insert("italic".to_string(), "true".to_string());
                 }
@@ -3661,9 +3675,9 @@ pub fn generate(
                     }
 
                     // 创建脚注段落
-                    let mut paragraph = crate::docx::adapter::docx::Paragraph::new();//底部脚注内容使用单倍行距
-                    // let mut paragraph = crate::docx::adapter::docx::Paragraph::new_with_spacing(spacing.clone());
-                    // paragraph.style("notes");
+                    let mut paragraph = crate::docx::adapter::docx::Paragraph::new(); //底部脚注内容使用单倍行距
+                                                                                      // let mut paragraph = crate::docx::adapter::docx::Paragraph::new_with_spacing(spacing.clone());
+                                                                                      // paragraph.style("notes");
 
                     // 创建文本运行 - 参考原项目使用固定颜色 #868686
                     let mut footnote_options = create_basic_options_map("#868686");
