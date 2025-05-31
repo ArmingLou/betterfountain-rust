@@ -1358,25 +1358,27 @@ impl Paragraph {
                     }
                     HorizontalPositionAlign::Center => {
                         // 居中对齐，使用微小偏移确保独立性
+                        paragraph = paragraph.x_align(docx_rs::AlignmentType::Center.to_string());
 
-                        if let Some(width) = frame.width {
-                            if let (Some(page_width), Some(left_margin), Some(right_margin)) =
-                                (frame.page_width, frame.left_margin, frame.right_margin)
-                            {
-                                paragraph = paragraph.frame_x((page_width- left_margin-right_margin - width)/2);
-                            }
-                        }
+                        // if let Some(width) = frame.width {
+                        //     if let (Some(page_width), Some(left_margin), Some(right_margin)) =
+                        //         (frame.page_width, frame.left_margin, frame.right_margin)
+                        //     {
+                        //         paragraph = paragraph.frame_x((page_width- left_margin-right_margin - width)/2);
+                        //     }
+                        // }
                     }
                     HorizontalPositionAlign::Right => {
                         // 右对齐，使用微小偏移确保独立性
+                        paragraph = paragraph.x_align(docx_rs::AlignmentType::Right.to_string());
                         
-                        if let Some(width) = frame.width {
-                            if let (Some(page_width), Some(left_margin), Some(right_margin)) =
-                                (frame.page_width, frame.left_margin, frame.right_margin)
-                            {
-                                paragraph = paragraph.frame_x(page_width- left_margin-right_margin - width);
-                            }
-                        }
+                        // if let Some(width) = frame.width {
+                        //     if let (Some(page_width), Some(left_margin), Some(right_margin)) =
+                        //         (frame.page_width, frame.left_margin, frame.right_margin)
+                        //     {
+                        //         paragraph = paragraph.frame_x(page_width- left_margin-right_margin - width);
+                        //     }
+                        // }
                     }
                     _ => {}
                 }
