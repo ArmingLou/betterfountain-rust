@@ -1339,68 +1339,59 @@ impl Paragraph {
         );
 
         if let Some(frame) = &self.frame {
-            
-            paragraph = paragraph.add_run(docx_rs::Run::new().add_break(docx_rs::BreakType::TextWrapping)); //j加个换行才能让宽度伸展到全页，然后右对齐才有效果
-            
+            // paragraph = paragraph.add_run(docx_rs::Run::new().add_break(docx_rs::BreakType::TextWrapping)); //j加个换行才能让宽度伸展到全页，然后右对齐才有效果
+
             // 应用框架属性
             if let Some(width) = frame.width {
                 // 设置框架宽度
                 // docx-rs 的 size 方法只接受一个参数，表示宽度
-                paragraph = paragraph.size(width as usize);
+                // paragraph = paragraph.size(width as usize);
+                paragraph = paragraph.frame_width(width as u32);
             }
-
-            // 根据锚点类型和对齐方式设置不同的水平位置偏移，确保 frame 独立
-            let x_offset = match (&frame.anchor_horizontal, &frame.x_align) {
-                (Some(crate::docx::adapter::FrameAnchorType::Page), Some(HorizontalPositionAlign::Left)) => 0,
-                (Some(crate::docx::adapter::FrameAnchorType::Margin), Some(HorizontalPositionAlign::Center)) => 1,
-                (Some(crate::docx::adapter::FrameAnchorType::Text), Some(HorizontalPositionAlign::Right)) => 2,
-                (Some(crate::docx::adapter::FrameAnchorType::Page), Some(HorizontalPositionAlign::Center)) => 3,
-                (Some(crate::docx::adapter::FrameAnchorType::Margin), Some(HorizontalPositionAlign::Left)) => 4,
-                (Some(crate::docx::adapter::FrameAnchorType::Text), Some(HorizontalPositionAlign::Left)) => 5,
-                _ => 0,
-            };
 
             // 设置水平位置
             if let Some(x_align) = &frame.x_align {
                 match x_align {
                     HorizontalPositionAlign::Left => {
                         // 左对齐，使用微小偏移确保独立性
-                        paragraph = paragraph.frame_x(x_offset);
+                        paragraph = paragraph.frame_x(0);
                     }
                     HorizontalPositionAlign::Center => {
                         // 居中对齐，使用微小偏移确保独立性
-                        paragraph = paragraph.frame_x(x_offset);
+
+                        if let Some(width) = frame.width {
+                            if let (Some(page_width), Some(left_margin), Some(right_margin)) =
+                                (frame.page_width, frame.left_margin, frame.right_margin)
+                            {
+                                paragraph = paragraph.frame_x((page_width- left_margin-right_margin - width)/2);
+                            }
+                        }
                     }
                     HorizontalPositionAlign::Right => {
                         // 右对齐，使用微小偏移确保独立性
-                        paragraph = paragraph.frame_x(x_offset);
                         
+                        if let Some(width) = frame.width {
+                            if let (Some(page_width), Some(left_margin), Some(right_margin)) =
+                                (frame.page_width, frame.left_margin, frame.right_margin)
+                            {
+                                paragraph = paragraph.frame_x(page_width- left_margin-right_margin - width);
+                            }
+                        }
                     }
                     _ => {}
                 }
             }
-
-            // 根据锚点类型和对齐方式设置不同的垂直位置偏移，确保 frame 独立
-            let y_base_offset = match (&frame.anchor_vertical, &frame.y_align) {
-                (Some(crate::docx::adapter::FrameAnchorType::Page), Some(VerticalPositionAlign::Top)) => -240,
-                (Some(crate::docx::adapter::FrameAnchorType::Margin), Some(VerticalPositionAlign::Top)) => -239,
-                (Some(crate::docx::adapter::FrameAnchorType::Text), Some(VerticalPositionAlign::Top)) => -238,
-                (Some(crate::docx::adapter::FrameAnchorType::Page), Some(VerticalPositionAlign::Center)) => 5000-240,
-                (Some(crate::docx::adapter::FrameAnchorType::Margin), Some(VerticalPositionAlign::Center)) => 5001-240,
-                (Some(crate::docx::adapter::FrameAnchorType::Text), Some(VerticalPositionAlign::Center)) => 5002-240,
-                _ => -240,
-            };
 
             // 设置垂直位置
             if let Some(y_align) = &frame.y_align {
                 match y_align {
                     VerticalPositionAlign::Top => {
                         // 顶部对齐，使用基础偏移确保独立性
-                        paragraph = paragraph.frame_y(y_base_offset);
+                        paragraph = paragraph.frame_y(0);
                     }
                     VerticalPositionAlign::Center => {
                         // 居中对齐，使用基础偏移确保独立性
-                        paragraph = paragraph.frame_y(y_base_offset);
+                        paragraph = paragraph.frame_y(5000);
                     }
                     VerticalPositionAlign::Bottom => {
                         // 底部对齐
@@ -1447,9 +1438,9 @@ impl Paragraph {
                             // 这个因子可以根据实际效果进行调整
                             let scale_factor = 0.89;
                             let scale_factor2 = 1.89; // 另一个比例因子，单独作用于行数
-                            let bottom_pos = (((page_height - bottom_margin - 240) as f32) * scale_factor
+                            let bottom_pos = (((page_height - bottom_margin) as f32) * scale_factor
                                 - (line_height as f32 * scale_factor2 * lines as f32))
-                                as i32; // -240 是因为所有位置都前置加了空行
+                                as i32;
 
                             paragraph = paragraph.frame_y(bottom_pos);
                         } else {

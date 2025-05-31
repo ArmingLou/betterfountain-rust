@@ -534,8 +534,14 @@ pub struct ParagraphFrame {
     pub y_align: Option<VerticalPositionAlign>,
     /// 页面高度
     pub page_height: Option<i32>,
+    /// 页面宽度
+    pub page_width: Option<i32>,
     /// 顶部边距
     pub top_margin: Option<i32>,
+    /// 左部边距
+    pub left_margin: Option<i32>,
+    /// 左部边距
+    pub right_margin: Option<i32>,
     /// 底部边距
     pub bottom_margin: Option<i32>,
     pub line_height: Option<i32>,
