@@ -299,6 +299,22 @@ pub fn convert_inches_to_twip(inches: f32) -> i32 {
     (inches * 1440.0) as i32
 }
 
+/// 将英寸转换为 磅
+pub fn convert_inches_to_point(inches: f32) -> f32 {
+    inches * 72.0
+}
+
+/// 将 磅 转为 twip (常用于字体)
+pub fn convert_point_to_inches(point: f32) -> f32 {
+    point / 72.0
+}
+
+
+/// 将 磅 转为 twip (常用于字体)
+pub fn convert_point_to_twip(point: f32) -> i32 {
+    convert_inches_to_twip(convert_point_to_inches(point))
+}
+
 /// 将英寸转换为 twip (驼峰命名，兼容 TypeScript 版本)
 #[allow(non_snake_case)]
 pub fn convertInchesToTwip(inches: f32) -> i32 {

@@ -12,7 +12,7 @@ use thiserror::Error;
 // 使用适配器中的类型
 use crate::docx::adapter::docx::{Document, TextRun};
 use crate::docx::adapter::{
-    convert_inches_to_twip, DocxAdapterError, DocxAsBase64, DocxStats, LineStruct, RunProps,
+    convert_inches_to_twip, convert_point_to_inches, DocxAdapterError, DocxAsBase64, DocxStats, LineStruct, RunProps,
     StyleStash, UnderlineTypeConst,
 };
 
@@ -40,17 +40,17 @@ pub type DocxResult<T> = Result<T, DocxError>;
 /// 打印配置
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PrintProfile {
-    /// 字体大小
+    /// 字体大小 //磅
     pub font_size: f32,
-    /// 注释字体大小
+    /// 注释字体大小  //磅
     pub note_font_size: f32,
     /// 每页行数
     pub lines_per_page: usize,
-    /// 页面宽度
+    /// 页面宽度 //英寸
     pub page_width: f32,
-    /// 页面高度
+    /// 页面高度 //英寸
     pub page_height: f32,
-    /// 字体宽度
+    /// 字体宽度 //英寸
     pub font_width: f32,
     /// 纸张大小
     pub paper_size: String,
@@ -80,7 +80,7 @@ pub struct PrintProfile {
     pub section: SectionConfig,
     /// 概要配置
     pub synopsis: SynopsisConfig,
-    /// 注释行高
+    /// 注释行高 //英寸
     pub note_line_height: f32,
 }
 
@@ -88,14 +88,14 @@ impl Default for PrintProfile {
     fn default() -> Self {
         Self {
             // 基于"中文a4"配置
-            font_size: 12.0,
+            font_size: 12.0, //磅
             note_font_size: 9.0,
-            lines_per_page: 20,
+            lines_per_page: 30,
             page_width: 8.27,
             page_height: 11.69,
-            font_width: 0.1,
+            font_width: 0.1, //英寸
             paper_size: "a4".to_string(),
-            top_margin: 1.19,
+            top_margin: 1.19, //英寸
             bottom_margin: 1.0,
             left_margin: 1.5,
             right_margin: 1.5,
@@ -403,8 +403,8 @@ impl DocxContext {
             font_names.insert("bold_italic".to_string(), options.font_bold_italic.clone());
         }
 
-        let font_size = (options.print_profile.font_size * 2.0) as usize;
-        let note_font_size = (options.print_profile.note_font_size * 2.0) as usize;
+        let font_size = (options.print_profile.font_size) as usize;
+        let note_font_size = (options.print_profile.note_font_size) as usize;
 
         let run_normal = RunProps {
             size: Some(font_size),
@@ -1468,6 +1468,7 @@ impl DocxContext {
                         let footnote_ref = crate::docx::adapter::docx::TextRun::footnote_reference(
                             self.notes_len,
                             footnote_runs,
+                            self.run_notes.clone(),
                         );
                         text_objects.push(footnote_ref);
                     }
@@ -1531,14 +1532,14 @@ impl DocxContext {
                     // 只有当 draw = true 时才处理文本
                     if draw {
                         let mut font_size = if let Some(font_size) = options.get("fontSize") {
-                            font_size.parse::<usize>().unwrap_or(24) * 2
+                            font_size.parse::<usize>().unwrap_or(12) 
                         } else {
-                            (self.options.print_profile.font_size * 2.0) as usize
+                            (self.options.print_profile.font_size ) as usize
                         };
 
                         // 参考原项目逻辑：如果在脚注中（override_color存在），使用脚注字体大小
                         if self.format_state.override_color.is_some() {
-                            font_size = (self.options.print_profile.note_font_size * 2.0) as usize;
+                            font_size = (self.options.print_profile.note_font_size ) as usize;
                         }
 
                         // 检查 options 中的粗体设置
@@ -2180,7 +2181,7 @@ pub fn generate(
             title_section.properties = section_props.clone();
 
             // 计算页面尺寸（一次性计算，避免重复）
-            let dimensions = calculate_page_dimensions(print, line_height);
+            let dimensions = calculate_page_dimensions(print, convert_point_to_inches(12.0));//标题页固定单倍行距s所以用240twip（12磅）,参数传入的单位需要的是 英寸
 
             // 处理标题页内容（按固定顺序：tl | tc | tr | cc | bl | br）
             for key in ["tl", "tc", "tr", "cc", "bl", "br"] {
@@ -3646,7 +3647,7 @@ pub fn generate(
                     }
 
                     // 创建脚注段落
-                    let mut paragraph = crate::docx::adapter::docx::Paragraph::new();
+                    let mut paragraph = crate::docx::adapter::docx::Paragraph::new();//底部脚注内容使用单倍行距
                     // let mut paragraph = crate::docx::adapter::docx::Paragraph::new_with_spacing(spacing.clone());
                     // paragraph.style("notes");
 

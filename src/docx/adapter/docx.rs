@@ -93,7 +93,11 @@ impl ParagraphSpacing {
         }
 
         if let Some(line) = self.line {
-            println!("【适配器日志】设置行距: {} twips ({:.1}倍单倍行距)", line, line as f32 / 240.0);
+            println!(
+                "【适配器日志】设置行距: {} twips ({:.1}倍单倍行距)",
+                line,
+                line as f32 / 240.0
+            );
             spacing = spacing.line(line);
         }
 
@@ -632,7 +636,8 @@ impl Document {
                 // 设置间距
                 if let Some(spacing) = &paragraph_style.spacing {
                     if let Some(_line) = spacing.line {
-                        paragraph_property = paragraph_property.line_spacing(spacing.to_docx_line_spacing());
+                        paragraph_property =
+                            paragraph_property.line_spacing(spacing.to_docx_line_spacing());
                     }
                 }
 
@@ -1333,7 +1338,6 @@ impl Paragraph {
             None,
         );
 
-
         if let Some(frame) = &self.frame {
             // 应用框架属性
             if let Some(width) = frame.width {
@@ -1414,7 +1418,7 @@ impl Paragraph {
                             lines = lines.max(1);
 
                             let bottom_pos =
-                                page_height - bottom_margin - (240 * lines as i32); //标题页固定单倍行距s所以用240（12磅）
+                                page_height - bottom_margin - (line_height * lines as i32);
 
                             // 使用一个比例因子，将 bottom_pos 转换为更大的值
                             // 这个因子可以根据实际效果进行调整
@@ -1443,7 +1447,7 @@ impl Paragraph {
         for run in &self.runs {
             paragraph = paragraph.add_run(run.to_docx_run(mstyles.clone(), footnotes.clone()));
         }
-        
+
         if let Some(spacing) = &self.spacing {
             // 应用行距和段落间距设置
             paragraph = paragraph.line_spacing(spacing.to_docx_line_spacing());
@@ -1523,10 +1527,10 @@ impl TextRun {
     }
 
     /// 创建脚注引用运行
-    pub fn footnote_reference(footnote_id: usize, footnote_content: Vec<Paragraph>) -> Self {
+    pub fn footnote_reference(footnote_id: usize, footnote_content: Vec<Paragraph>, props: RunProps) -> Self {
         Self {
             text: format!("[{}]", footnote_id), // 显示脚注编号
-            props: RunProps::default(),
+            props: props,
             break_before: false,
             children: Vec::new(),
             footnote_id: Some(footnote_id),
@@ -1639,8 +1643,8 @@ impl RunTrait for TextRun {
                     if i == 0 {
                         // 克隆并插入脚注编号
                         let mut pg_with_no = pg.clone();
-                        pg_with_no.add_run_before(RunType::Text(TextRun::new(
-                            format!("[{}]", footnote_id).as_str(),
+                        pg_with_no.add_run_before(RunType::Text(TextRun::with_props(
+                            format!("[{}] ", footnote_id).as_str(), self.props.clone().color("#000000")
                         )));
                         footnote = footnote.add_content(
                             pg_with_no.to_docx_paragraph(mstyles.clone(), footnotes.clone()),
@@ -1665,8 +1669,8 @@ impl RunTrait for TextRun {
                         if i == 0 {
                             // 克隆并插入脚注编号
                             let mut pg_with_no = pg.clone();
-                            pg_with_no.add_run_before(RunType::Text(TextRun::new(
-                                format!("[{}]", footnote_id).as_str(),
+                            pg_with_no.add_run_before(RunType::Text(TextRun::with_props(
+                                format!("[{}] ", footnote_id).as_str(), self.props.clone().color("#000000")
                             )));
                             footnote = footnote.add_content(
                                 pg_with_no.to_docx_paragraph(mstyles.clone(), footnotes.clone()),
@@ -1681,11 +1685,10 @@ impl RunTrait for TextRun {
             }
 
             // 创建带有脚注引用的运行
-            return docx_rs::Run::new()
-                .add_footnote_reference_with_size(
-                    footnote,
-                    (self.props.size.unwrap_or(24) as f64 * 1.3) as usize,
-                );
+            return docx_rs::Run::new().add_footnote_reference_with_size(
+                footnote,
+                (self.props.size.unwrap_or(12) as f64 * 2.0 * 1.3) as usize, // 适配，字体磅数都要*2 ，比如实际的12磅实际传入参数需要24
+            );
         }
 
         // 普通文本运行
@@ -1714,7 +1717,7 @@ impl RunTrait for TextRun {
         }
 
         if let Some(size) = self.props.size {
-            run = run.size(size);
+            run = run.size(size*2);// 适配，字体磅数都要*2 ，比如实际的12磅实际传入参数需要24
         }
 
         if let Some(font) = &self.props.font {
@@ -1874,7 +1877,7 @@ impl RunTrait for HyperlinkRun {
 
         // 添加样式
         if let Some(size) = self.props.size {
-            run = run.size(size);
+            run = run.size(size * 2); // 适配，字体磅数都要*2 ，比如实际的12磅实际传入参数需要24
         }
 
         if let Some(font) = &self.props.font {
@@ -2013,7 +2016,7 @@ impl RunTrait for PageNumberRun {
 
         // 应用样式
         if let Some(size) = self.props.size {
-            run = run.size(size);
+            run = run.size(size * 2); // 适配，字体磅数都要*2 ，比如实际的12磅实际传入参数需要24
         }
 
         if let Some(font) = &self.props.font {
