@@ -1546,6 +1546,10 @@ impl DocxContext {
                         let options_bold =
                             options.get("bold").map(|v| v == "true").unwrap_or(false);
 
+                        // 检查 options 中的粗体设置
+                        let options_italic =
+                            options.get("italic").map(|v| v == "true").unwrap_or(false);
+
                         // 根据当前格式状态选择预定义的样式，与原项目逻辑保持一致
                         let mut run_props = if self.format_state.bold_italic {
                             // 粗体斜体状态：使用 run_bold_italic
@@ -1555,7 +1559,7 @@ impl DocxContext {
                             self.run_bold.clone()
                         } else if self.format_state.italic
                             || self.options.italic_global
-                            || self.options.italic_dynamic
+                            || self.options.italic_dynamic || options_italic
                         {
                             // 斜体状态：使用 run_italic
                             self.run_italic.clone()
@@ -2789,6 +2793,16 @@ pub fn generate(
                 // 设置左右缩进
                 paragraph.indent(section_indent);
                 paragraph.indent_right(section_indent);
+                
+                let mut synopsis_options = if let Some(color) = print.synopsis.color.as_ref() {
+                    create_basic_options_map(color)
+                } else {
+                    default_text_options.clone()
+                };
+                
+                if print.synopsis.italic {
+                    synopsis_options.insert("italic".to_string(), "true".to_string());
+                }
 
                 // 处理文本
                 let mut text = line.text.clone();
@@ -2797,7 +2811,7 @@ pub fn generate(
                 // 创建文本运行
                 let text_runs = doc.text2(
                     &text,
-                    &default_text_options,
+                    &synopsis_options,
                     if bottom_notes {
                         Some(&mut current_line_notes)
                     } else {

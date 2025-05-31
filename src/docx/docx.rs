@@ -2,10 +2,8 @@ use crate::models::{Conf, ScriptToken};
 use crate::parser::ParseOutput;
 use std::collections::HashMap;
 
-use super::docx_maker::{DocxOptions, DocxError, DocxResult, PrintProfile, generate_docx};
+use super::docx_maker::{generate_docx, DocxError, DocxOptions, DocxResult, PrintProfile};
 use super::metadata_extractor::{extract_metadata_from_parsed_document, ExtractedMetadata};
-
-
 
 /// DOCX生成错误
 pub type DocxGenerateError = DocxError;
@@ -61,9 +59,16 @@ pub async fn generate_docx_document(
     // 创建一个可变的解析结果副本
     let mut parsed_document_copy = parsed_document.clone();
 
-    println!("【generate_docx_document】标题页元素数量: {}", parsed_document_copy.title_page.len());
+    println!(
+        "【generate_docx_document】标题页元素数量: {}",
+        parsed_document_copy.title_page.len()
+    );
     for (key, tokens) in &parsed_document_copy.title_page {
-        println!("【generate_docx_document】标题页元素 {}: {} 个 token", key, tokens.len());
+        println!(
+            "【generate_docx_document】标题页元素 {}: {} 个 token",
+            key,
+            tokens.len()
+        );
         if key == "cc" {
             for (i, token) in tokens.iter().enumerate() {
                 println!("【generate_docx_document】cc token {}: {}", i, token.text);
@@ -73,7 +78,8 @@ pub async fn generate_docx_document(
 
     // 提取元数据
     println!("【generate_docx_document】开始从标题页提取元数据");
-    let extracted_metadata = extract_metadata_from_parsed_document(&parsed_document_copy, &config.font_family);
+    let extracted_metadata =
+        extract_metadata_from_parsed_document(&parsed_document_copy, &config.font_family);
     println!("【generate_docx_document】元数据提取完成");
 
     let metadata = extracted_metadata.metadata;
@@ -84,22 +90,21 @@ pub async fn generate_docx_document(
     let font_bold = extracted_metadata.font_bold;
     let font_italic = extracted_metadata.font_italic;
     let font_bold_italic = extracted_metadata.font_bold_italic;
-    
+
     let mut print_sections = config.print_sections.clone();
     let mut print_synopsis = config.print_synopsis.clone();
-    
+
     if let Some(print_sections_str) = metadata.get("print.print_sections") {
         if let Ok(_value) = print_sections_str.parse::<f32>() {
             print_sections = print_sections_str != "0";
         }
     }
-    
+
     if let Some(print_synopsis_str) = metadata.get("print.print_synopsis") {
         if let Ok(_value) = print_synopsis_str.parse::<f32>() {
             print_synopsis = print_synopsis_str != "0";
         }
     }
-    
 
     // 预处理 tokens
     let mut current_index = 0;
@@ -152,7 +157,10 @@ pub async fn generate_docx_document(
         }
 
         // 在场景之间添加额外的分隔符
-        if config.double_space_between_scenes && current_token.token_type == "scene_heading" && current_token.number.as_deref() != Some("1") {
+        if config.double_space_between_scenes
+            && current_token.token_type == "scene_heading"
+            && current_token.number.as_deref() != Some("1")
+        {
             // 创建额外的分隔符
             let separator = ScriptToken {
                 token_type: "separator".to_string(),
@@ -186,7 +194,9 @@ pub async fn generate_docx_document(
     }
 
     // 清理末尾的分隔符
-    while !parsed_document_copy.tokens.is_empty() && parsed_document_copy.tokens.last().unwrap().token_type == "separator" {
+    while !parsed_document_copy.tokens.is_empty()
+        && parsed_document_copy.tokens.last().unwrap().token_type == "separator"
+    {
         parsed_document_copy.tokens.pop();
     }
 
@@ -204,7 +214,7 @@ pub async fn generate_docx_document(
     if let Some(f) = footer {
         config_copy.print_footer = f;
     }
-    
+
     config_copy.print_sections = print_sections.clone();
     config_copy.print_synopsis = print_synopsis.clone();
 
@@ -214,21 +224,6 @@ pub async fn generate_docx_document(
 
     // 设置打印配置
     let mut print_profile = config.print_profile.clone();
-
-    // 根据配置设置打印配置
-    if config.page_size == "Letter" {
-        print_profile.page_width = 8.5;
-        print_profile.page_height = 11.0;
-        print_profile.paper_size = "Letter".to_string();
-    }
-
-    // 使用默认值
-    print_profile.top_margin = 1.0;
-    print_profile.bottom_margin = 1.0;
-    print_profile.left_margin = 1.5;
-    print_profile.right_margin = 1.0;
-
-    // 不需要额外设置元数据，保持与原始 TypeScript 版本一致
 
     // 从元数据中更新打印配置
     // 检查是否存在 print 对象
@@ -331,24 +326,54 @@ pub async fn generate_docx_document(
         }
     }
 
-    // 如果没有从元数据中读取到值，则使用默认值（保持与原项目一致）
-    // 注意：不要强制设置为 left_margin，这会覆盖从元数据中读取的值
+    // 重新 动态 计算 print_profile 各配置。
+    print_profile.action.feed = print_profile.left_margin; //action feed 固定为文档的 left_margin
+    print_profile.scene_heading.feed = print_profile.action.feed;
+    let iw = print_profile.page_width - print_profile.left_margin - print_profile.right_margin;
+    let id = print_profile.action.feed - print_profile.left_margin;
+    let aw = iw - id - id;
+    print_profile.character.feed =
+        (aw / 2.0) + print_profile.action.feed - print_profile.font_width * 7.0; //character feed 固定为： 相对于 action 内容的中间, 左移动7个字符
+    print_profile.dialogue.feed = (print_profile.character.feed - print_profile.action.feed) / 2.0
+        + print_profile.action.feed; //dialogue feed 固定为： character feed 与 action feed 的中间
+    print_profile.parenthetical.feed = (print_profile.character.feed - print_profile.dialogue.feed)
+        / 2.0
+        + print_profile.dialogue.feed;
+    // print_profile.more.feed = print_profile.character.feed;
+    print_profile.section.feed = if print_profile.action.feed - 1.0 >= 0.2 {
+        print_profile.action.feed - 1.0
+    } else {
+        0.2
+    };
+    print_profile.synopsis.feed = Some(print_profile.section.feed);
 
-    let inner_width = print_profile.page_width - print_profile.left_margin - print_profile.right_margin;
+    let inner_width =
+        print_profile.page_width - print_profile.left_margin - print_profile.right_margin;
     let indent = print_profile.action.feed - print_profile.left_margin;
     let available_width = inner_width - indent - indent;
 
-    print_profile.character.feed = (available_width / 2.0) + print_profile.action.feed - print_profile.font_width * 7.0;
-    print_profile.dialogue.feed = (print_profile.character.feed - print_profile.action.feed) / 2.0 + print_profile.action.feed;
-    print_profile.parenthetical.feed = (print_profile.character.feed - print_profile.dialogue.feed) / 2.0 + print_profile.dialogue.feed;
+    print_profile.character.feed =
+        (available_width / 2.0) + print_profile.action.feed - print_profile.font_width * 7.0;
+    print_profile.dialogue.feed = (print_profile.character.feed - print_profile.action.feed) / 2.0
+        + print_profile.action.feed;
+    print_profile.parenthetical.feed = (print_profile.character.feed - print_profile.dialogue.feed)
+        / 2.0
+        + print_profile.dialogue.feed;
 
     // 计算行高
-    let line_height = (print_profile.page_height - print_profile.top_margin - print_profile.bottom_margin) / print_profile.lines_per_page as f32;
+    let line_height =
+        (print_profile.page_height - print_profile.top_margin - print_profile.bottom_margin)
+            / print_profile.lines_per_page as f32;
     let line_height = (line_height * 100.0).round() / 100.0;
 
     // 调整底部边距
-    print_profile.bottom_margin = ((print_profile.page_height - print_profile.top_margin - (print_profile.lines_per_page as f32 * line_height)) * 100.0).round() / 100.0;
-    
+    print_profile.bottom_margin = ((print_profile.page_height
+        - print_profile.top_margin
+        - (print_profile.lines_per_page as f32 * line_height))
+        * 100.0)
+        .round()
+        / 100.0;
+
     println!("【bottom_margin】:");
     println!("  bottom_margin: {} pt", print_profile.bottom_margin);
 
@@ -370,35 +395,56 @@ pub async fn generate_docx_document(
     if output_path == "$STATS$" {
         // 返回统计信息
         println!("【generate_docx_document】开始获取统计信息 - get_docx_stats 分支");
-        println!("【generate_docx_document】title_page_processed = {}", docx_options.title_page_processed);
+        println!(
+            "【generate_docx_document】title_page_processed = {}",
+            docx_options.title_page_processed
+        );
         let stats = super::docx_maker::get_docx_stats(docx_options).await?;
         Ok(Some(DocxStats {
             page_count: stats.page_count as u32,
             page_count_real: stats.page_count_real as u32,
-            line_map: stats.line_map.into_iter()
-                .map(|(k, v)| (k as u32, LineStruct {
-                    sections: v.sections,
-                    scene: v.scene,
-                    page: v.page as u32,
-                    cumulative_duration: v.cumulative_duration,
-                }))
+            line_map: stats
+                .line_map
+                .into_iter()
+                .map(|(k, v)| {
+                    (
+                        k as u32,
+                        LineStruct {
+                            sections: v.sections,
+                            scene: v.scene,
+                            page: v.page as u32,
+                            cumulative_duration: v.cumulative_duration,
+                        },
+                    )
+                })
                 .collect(),
         }))
     } else if output_path == "$PREVIEW$" {
         // 返回Base64编码的文档
         println!("【generate_docx_document】开始生成预览 - get_docx_base64 分支");
-        println!("【generate_docx_document】title_page_processed = {}", docx_options.title_page_processed);
+        println!(
+            "【generate_docx_document】title_page_processed = {}",
+            docx_options.title_page_processed
+        );
         let base64_result = super::docx_maker::get_docx_base64(docx_options).await?;
         let stats = DocxStats {
             page_count: base64_result.stats.page_count as u32,
             page_count_real: base64_result.stats.page_count_real as u32,
-            line_map: base64_result.stats.line_map.into_iter()
-                .map(|(k, v)| (k as u32, LineStruct {
-                    sections: v.sections,
-                    scene: v.scene,
-                    page: v.page as u32,
-                    cumulative_duration: v.cumulative_duration,
-                }))
+            line_map: base64_result
+                .stats
+                .line_map
+                .into_iter()
+                .map(|(k, v)| {
+                    (
+                        k as u32,
+                        LineStruct {
+                            sections: v.sections,
+                            scene: v.scene,
+                            page: v.page as u32,
+                            cumulative_duration: v.cumulative_duration,
+                        },
+                    )
+                })
                 .collect(),
         };
 
@@ -406,7 +452,10 @@ pub async fn generate_docx_document(
     } else {
         // 生成DOCX文件
         println!("【generate_docx_document】开始生成 DOCX 文件 - get_docx 分支");
-        println!("【generate_docx_document】title_page_processed = {}", docx_options.title_page_processed);
+        println!(
+            "【generate_docx_document】title_page_processed = {}",
+            docx_options.title_page_processed
+        );
         super::docx_maker::get_docx(docx_options).await?;
         println!("【generate_docx_document】DOCX 文件生成完成");
         Ok(None)
@@ -438,13 +487,20 @@ pub async fn get_docx_stats(
     Ok(DocxStats {
         page_count: stats.page_count as u32,
         page_count_real: stats.page_count_real as u32,
-        line_map: stats.line_map.into_iter()
-            .map(|(k, v)| (k as u32, LineStruct {
-                sections: v.sections,
-                scene: v.scene,
-                page: v.page as u32,
-                cumulative_duration: v.cumulative_duration,
-            }))
+        line_map: stats
+            .line_map
+            .into_iter()
+            .map(|(k, v)| {
+                (
+                    k as u32,
+                    LineStruct {
+                        sections: v.sections,
+                        scene: v.scene,
+                        page: v.page as u32,
+                        cumulative_duration: v.cumulative_duration,
+                    },
+                )
+            })
             .collect(),
     })
 }
@@ -458,7 +514,8 @@ pub async fn get_docx_base64(
     let mut parsed_document_copy = parsed_document.clone();
 
     // 提取元数据
-    let extracted_metadata = extract_metadata_from_parsed_document(&parsed_document_copy, &config.font_family);
+    let extracted_metadata =
+        extract_metadata_from_parsed_document(&parsed_document_copy, &config.font_family);
 
     let metadata = extracted_metadata.metadata;
     let watermark = extracted_metadata.watermark;
@@ -468,16 +525,16 @@ pub async fn get_docx_base64(
     let font_bold = extracted_metadata.font_bold;
     let font_italic = extracted_metadata.font_italic;
     let font_bold_italic = extracted_metadata.font_bold_italic;
-    
+
     let mut print_sections = config.print_sections.clone();
     let mut print_synopsis = config.print_synopsis.clone();
-    
+
     if let Some(print_sections_str) = metadata.get("print.print_sections") {
         if let Ok(_value) = print_sections_str.parse::<f32>() {
             print_sections = print_sections_str != "0";
         }
     }
-    
+
     if let Some(print_synopsis_str) = metadata.get("print.print_synopsis") {
         if let Ok(_value) = print_synopsis_str.parse::<f32>() {
             print_synopsis = print_synopsis_str != "0";
@@ -535,7 +592,10 @@ pub async fn get_docx_base64(
         }
 
         // 在场景之间添加额外的分隔符
-        if config.double_space_between_scenes && current_token.token_type == "scene_heading" && current_token.number.as_deref() != Some("1") {
+        if config.double_space_between_scenes
+            && current_token.token_type == "scene_heading"
+            && current_token.number.as_deref() != Some("1")
+        {
             // 创建额外的分隔符
             let separator = ScriptToken {
                 token_type: "separator".to_string(),
@@ -569,7 +629,9 @@ pub async fn get_docx_base64(
     }
 
     // 清理末尾的分隔符
-    while !parsed_document_copy.tokens.is_empty() && parsed_document_copy.tokens.last().unwrap().token_type == "separator" {
+    while !parsed_document_copy.tokens.is_empty()
+        && parsed_document_copy.tokens.last().unwrap().token_type == "separator"
+    {
         parsed_document_copy.tokens.pop();
     }
 
@@ -587,7 +649,7 @@ pub async fn get_docx_base64(
     if let Some(f) = footer {
         config_copy.print_footer = f;
     }
-    
+
     config_copy.print_sections = print_sections.clone();
     config_copy.print_synopsis = print_synopsis.clone();
 
@@ -714,20 +776,32 @@ pub async fn get_docx_base64(
     // 如果没有从元数据中读取到值，则使用默认值（保持与原项目一致）
     // 注意：不要强制设置为 left_margin，这会覆盖从元数据中读取的值
 
-    let inner_width = print_profile.page_width - print_profile.left_margin - print_profile.right_margin;
+    let inner_width =
+        print_profile.page_width - print_profile.left_margin - print_profile.right_margin;
     let indent = print_profile.action.feed - print_profile.left_margin;
     let available_width = inner_width - indent - indent;
 
-    print_profile.character.feed = (available_width / 2.0) + print_profile.action.feed - print_profile.font_width * 7.0;
-    print_profile.dialogue.feed = (print_profile.character.feed - print_profile.action.feed) / 2.0 + print_profile.action.feed;
-    print_profile.parenthetical.feed = (print_profile.character.feed - print_profile.dialogue.feed) / 2.0 + print_profile.dialogue.feed;
+    print_profile.character.feed =
+        (available_width / 2.0) + print_profile.action.feed - print_profile.font_width * 7.0;
+    print_profile.dialogue.feed = (print_profile.character.feed - print_profile.action.feed) / 2.0
+        + print_profile.action.feed;
+    print_profile.parenthetical.feed = (print_profile.character.feed - print_profile.dialogue.feed)
+        / 2.0
+        + print_profile.dialogue.feed;
 
     // 计算行高
-    let line_height = (print_profile.page_height - print_profile.top_margin - print_profile.bottom_margin) / print_profile.lines_per_page as f32;
+    let line_height =
+        (print_profile.page_height - print_profile.top_margin - print_profile.bottom_margin)
+            / print_profile.lines_per_page as f32;
     let line_height = (line_height * 100.0).round() / 100.0;
 
     // 调整底部边距
-    print_profile.bottom_margin = ((print_profile.page_height - print_profile.top_margin - (print_profile.lines_per_page as f32 * line_height)) * 100.0).round() / 100.0;
+    print_profile.bottom_margin = ((print_profile.page_height
+        - print_profile.top_margin
+        - (print_profile.lines_per_page as f32 * line_height))
+        * 100.0)
+        .round()
+        / 100.0;
 
     // 创建DOCX选项
     let mut docx_options = DocxOptions::default();
@@ -752,13 +826,21 @@ pub async fn get_docx_base64(
         stats: DocxStats {
             page_count: base64_result.stats.page_count as u32,
             page_count_real: base64_result.stats.page_count_real as u32,
-            line_map: base64_result.stats.line_map.into_iter()
-                .map(|(k, v)| (k as u32, LineStruct {
-                    sections: v.sections,
-                    scene: v.scene,
-                    page: v.page as u32,
-                    cumulative_duration: v.cumulative_duration,
-                }))
+            line_map: base64_result
+                .stats
+                .line_map
+                .into_iter()
+                .map(|(k, v)| {
+                    (
+                        k as u32,
+                        LineStruct {
+                            sections: v.sections,
+                            scene: v.scene,
+                            page: v.page as u32,
+                            cumulative_duration: v.cumulative_duration,
+                        },
+                    )
+                })
                 .collect(),
         },
     })
