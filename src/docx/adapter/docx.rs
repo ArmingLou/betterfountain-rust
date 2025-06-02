@@ -1783,7 +1783,11 @@ impl RunTrait for TextRun {
         }
 
         if let Some(color) = &self.props.color {
-            run = run.color(color);
+            if color.starts_with("#") {
+                run = run.color(color[1..].to_uppercase());
+            } else {
+                run = run.color(color.to_uppercase());
+            }
         }
 
         if let Some(_spacing) = self.props.character_spacing {
@@ -2071,7 +2075,11 @@ impl RunTrait for PageNumberRun {
         }
 
         if let Some(color) = &self.props.color {
-            run = run.color(color);
+            if color.starts_with("#") {
+                run = run.color(color[1..].to_uppercase());
+            } else {
+                run = run.color(color.to_uppercase());
+            }
         }
 
         run
