@@ -1371,7 +1371,7 @@ impl Paragraph {
                     HorizontalPositionAlign::Right => {
                         // 右对齐，使用微小偏移确保独立性
                         paragraph = paragraph.x_align(docx_rs::AlignmentType::Right.to_string());
-                        
+
                         // if let Some(width) = frame.width {
                         //     if let (Some(page_width), Some(left_margin), Some(right_margin)) =
                         //         (frame.page_width, frame.left_margin, frame.right_margin)
@@ -1404,8 +1404,7 @@ impl Paragraph {
                     }
                     VerticalPositionAlign::Bottom => {
                         paragraph = paragraph.y_align("bottom".to_string());
-                        
-                        
+
                         // 底部对齐
                         // 尝试使用更大的值来实现底部对齐
                         // 在 docx-rs 中，frame_y 的值范围是 0-9999
@@ -1455,8 +1454,7 @@ impl Paragraph {
                         //         as i32;
 
                         //     paragraph = paragraph.frame_y(bottom_pos);
-                            
-                            
+
                         // } else {
                         //     // 如果没有提供页面信息，则使用一个非常大的值
                         //     // 这个值可以根据实际效果进行调整
@@ -2167,8 +2165,10 @@ impl TableBorder {
 #[derive(Debug, Clone)]
 pub struct TableConfig {
     pub rows: Option<Vec<TableRow>>,
+    pub columnWidths: Option<Vec<usize>>,
     pub indent: Option<TableIndent>,
     pub borders: Option<TableBorders>,
+    pub without_borders: Option<bool>,
 }
 
 impl TableConfig {
@@ -2176,8 +2176,10 @@ impl TableConfig {
     pub fn new() -> Self {
         Self {
             rows: None,
+            columnWidths: None,
             indent: None,
             borders: None,
+            without_borders: None,
         }
     }
 }
@@ -2186,8 +2188,10 @@ impl TableConfig {
 #[derive(Debug, Clone)]
 pub struct Table {
     pub rows: Vec<TableRow>,
+    pub columnWidths: Vec<usize>,
     pub indent: Option<TableIndent>,
     pub borders: Option<TableBorders>,
+    pub without_borders: bool,
 }
 
 impl Table {
@@ -2195,14 +2199,33 @@ impl Table {
     pub fn new() -> Self {
         Self {
             rows: Vec::new(),
+            columnWidths: Vec::new(),
             indent: None,
             borders: None,
+            without_borders: false,
+        }
+    }
+    pub fn new_without_borders() -> Self {
+        Self {
+            rows: Vec::new(),
+            columnWidths: Vec::new(),
+            indent: None,
+            borders: None,
+            without_borders: true,
         }
     }
 
     /// 使用配置创建新的表格
     pub fn with_config(config: TableConfig) -> Self {
         let mut table = Self::new();
+
+        if let Some(without) = config.without_borders {
+            table.without_borders = without;
+        }
+
+        if let Some(grid) = config.columnWidths {
+            table.columnWidths = grid.clone();
+        }
 
         if let Some(indent) = config.indent {
             table.indent = Some(indent);
@@ -2233,6 +2256,18 @@ impl Table {
         self
     }
 
+    /// 设置缩进
+    pub fn columnWidths(&mut self, grid: Vec<usize>) -> &mut Self {
+        self.columnWidths = grid.clone();
+        self
+    }
+
+    /// 设置缩进
+    pub fn without_borders(&mut self, without: bool) -> &mut Self {
+        self.without_borders = without;
+        self
+    }
+
     /// 设置边框
     pub fn borders(&mut self, borders: TableBorders) -> &mut Self {
         self.borders = Some(borders);
@@ -2245,7 +2280,14 @@ impl Table {
         mstyles: Option<Styles>,
         footnotes: HashMap<usize, Footnote>,
     ) -> docx_rs::Table {
-        let mut table = docx_rs::Table::without_borders(Vec::new());
+        let mut table = if self.without_borders {
+            docx_rs::Table::without_borders(Vec::new())
+        } else {
+            docx_rs::Table::new(Vec::new())
+        };
+
+        // 设置缩进
+        table = table.set_grid(self.columnWidths.clone());
 
         // 设置缩进
         if let Some(indent) = &self.indent {

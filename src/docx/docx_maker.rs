@@ -846,6 +846,11 @@ impl DocxContext {
 
             // 创建表格
             let mut table = crate::docx::adapter::docx::Table::new();
+            table.without_borders(true);
+            table.columnWidths(vec![
+                dial_double_tab_column_width as usize,
+                dial_double_tab_column_width as usize,
+            ]);
 
             // 设置表格缩进
             table.indent = Some(crate::docx::adapter::docx::TableIndent {
