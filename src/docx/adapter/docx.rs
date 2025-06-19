@@ -1790,10 +1790,8 @@ impl RunTrait for TextRun {
             }
         }
 
-        if let Some(_spacing) = self.props.character_spacing {
-            // docx-rs 0.4.18-rc44 分支可能不支持 spacing 方法
-            // 暂时跳过字符间距处理
-            // run = run.spacing(spacing);
+        if let Some(spacing) = self.props.character_spacing {
+            run = run.character_spacing(spacing);
         }
 
         if let Some(true) = self.props.superscript {

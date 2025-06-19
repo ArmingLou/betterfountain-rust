@@ -12,8 +12,7 @@ use thiserror::Error;
 // 使用适配器中的类型
 use crate::docx::adapter::docx::{Document, TextRun};
 use crate::docx::adapter::{
-    convert_inches_to_twip, convert_point_to_inches, DocxAdapterError, DocxAsBase64, DocxStats,
-    LineStruct, RunProps, StyleStash, UnderlineTypeConst,
+    convert_inches_to_twip, convert_point_to_inches, convert_point_to_twip, DocxAdapterError, DocxAsBase64, DocxStats, LineStruct, RunProps, StyleStash, UnderlineTypeConst
 };
 
 use super::adapter::docx::ParagraphSpacing;
@@ -82,6 +81,8 @@ pub struct PrintProfile {
     pub synopsis: SynopsisConfig,
     /// 注释行高 //英寸
     pub note_line_height: f32,
+    /// 字距 //磅
+    pub character_spacing: f32,
 }
 
 impl Default for PrintProfile {
@@ -134,6 +135,7 @@ impl Default for PrintProfile {
             },
             synopsis: SynopsisConfig::default(),
             note_line_height: 0.17,
+            character_spacing: 1.0,
         }
     }
 }
@@ -1536,6 +1538,11 @@ impl DocxContext {
 
                     // 只有当 draw = true 时才处理文本
                     if draw {
+                        let character_spacing = if let Some(characterSpacing) = options.get("characterSpacing") {
+                            characterSpacing.parse::<f32>().unwrap_or(1.0)
+                        } else {
+                            self.options.print_profile.character_spacing
+                        };
                         let mut font_size = if let Some(font_size) = options.get("fontSize") {
                             font_size.parse::<usize>().unwrap_or(12)
                         } else {
@@ -1579,6 +1586,7 @@ impl DocxContext {
 
                         // 应用动态属性
                         run_props.size = Some(font_size);
+                        run_props.character_spacing = Some(convert_point_to_twip(character_spacing));
 
                         // 应用下划线
                         if self.format_state.underline {
