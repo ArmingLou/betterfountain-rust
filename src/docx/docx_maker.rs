@@ -12,7 +12,8 @@ use thiserror::Error;
 // 使用适配器中的类型
 use crate::docx::adapter::docx::{Document, TextRun};
 use crate::docx::adapter::{
-    convert_inches_to_twip, convert_point_to_inches, convert_point_to_twip, DocxAdapterError, DocxAsBase64, DocxStats, LineStruct, RunProps, StyleStash, UnderlineTypeConst
+    convert_inches_to_twip, convert_point_to_inches, convert_point_to_twip, DocxAdapterError,
+    DocxAsBase64, DocxStats, LineStruct, RunProps, StyleStash, UnderlineTypeConst,
 };
 
 use super::adapter::docx::ParagraphSpacing;
@@ -1538,11 +1539,12 @@ impl DocxContext {
 
                     // 只有当 draw = true 时才处理文本
                     if draw {
-                        let character_spacing = if let Some(characterSpacing) = options.get("characterSpacing") {
-                            characterSpacing.parse::<f32>().unwrap_or(1.0)
-                        } else {
-                            self.options.print_profile.character_spacing
-                        };
+                        let character_spacing =
+                            if let Some(characterSpacing) = options.get("characterSpacing") {
+                                characterSpacing.parse::<f32>().unwrap_or(1.0)
+                            } else {
+                                self.options.print_profile.character_spacing
+                            };
                         let mut font_size = if let Some(font_size) = options.get("fontSize") {
                             font_size.parse::<usize>().unwrap_or(12)
                         } else {
@@ -1586,7 +1588,8 @@ impl DocxContext {
 
                         // 应用动态属性
                         run_props.size = Some(font_size);
-                        run_props.character_spacing = Some(convert_point_to_twip(character_spacing));
+                        run_props.character_spacing =
+                            Some(convert_point_to_twip(character_spacing));
 
                         // 应用下划线
                         if self.format_state.underline {
@@ -3716,9 +3719,10 @@ pub fn generate(
                     }
 
                     // 创建脚注段落
-                    let mut paragraph = crate::docx::adapter::docx::Paragraph::new(); //底部脚注内容使用单倍行距
-                                                                                      // let mut paragraph = crate::docx::adapter::docx::Paragraph::new_with_spacing(spacing.clone());
-                                                                                      // paragraph.style("notes");
+                    // let mut paragraph = crate::docx::adapter::docx::Paragraph::new(); //底部脚注内容使用单倍行距
+                    let mut paragraph =
+                        crate::docx::adapter::docx::Paragraph::new_with_spacing(spacing.clone().line(convert_inches_to_twip(options.print_profile.note_line_height)));
+                    // paragraph.style("notes");
 
                     // 创建文本运行 - 参考原项目使用固定颜色 #868686
                     let mut footnote_options = create_basic_options_map("#868686");
