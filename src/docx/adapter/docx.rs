@@ -704,133 +704,216 @@ impl Document {
         }
 
         // 处理页眉和页脚
-        let mut has_header = false;
-        let mut has_footer = false;
+        // let mut has_header = false;
+        // let mut has_footer = false;
 
-        // 检查是否有任何section包含页眉或页脚
-        for section in &self.options.sections {
-            if section.headers.is_some() {
-                has_header = true;
-            }
-            if section.footers.is_some() {
-                has_footer = true;
-            }
-        }
+        // // 检查是否有任何section包含页眉或页脚
+        // for section in &self.options.sections {
+        //     if section.headers.is_some() {
+        //         has_header = true;
+        //     }
+        //     if section.footers.is_some() {
+        //         has_footer = true;
+        //     }
+        // }
 
         // 实现"只有正文页显示页码"的策略：
         // 使用docx-rs的section properties来控制页眉页脚
         // 为前面的页面设置空的first_header和first_footer
         // 为包含页码的section设置正常的页眉页脚
 
-        // 查找有页码的section（通常是最后一个section，即主要内容section）
-        let mut main_section_with_page_numbers = None;
-        let mut sections_before_main = 0;
+        // // 查找有页码的section（通常是最后一个section，即主要内容section）
+        // let mut main_section_with_page_numbers = None;
+        // let mut sections_before_main = 0;
 
-        for (index, section) in self.options.sections.iter().enumerate() {
-            if let Some(footers) = &section.footers {
-                // 检查页脚是否包含页码
-                let has_page_numbers = footers.default.children.iter().any(|paragraph| {
-                    paragraph
-                        .runs
-                        .iter()
-                        .any(|run| matches!(run, RunType::PageNumber(_)))
-                });
+        // for (index, section) in self.options.sections.iter().enumerate() {
+        //     if let Some(footers) = &section.footers {
+        //         // 检查页脚是否包含页码
+        //         let has_page_numbers = footers.default.children.iter().any(|paragraph| {
+        //             paragraph
+        //                 .runs
+        //                 .iter()
+        //                 .any(|run| matches!(run, RunType::PageNumber(_)))
+        //         });
 
-                if has_page_numbers {
-                    main_section_with_page_numbers = Some(section);
-                    sections_before_main = index;
-                    break;
-                }
-            }
-        }
+        //         if has_page_numbers {
+        //             main_section_with_page_numbers = Some(section);
+        //             sections_before_main = index;
+        //             break;
+        //         }
+        //     }
+        // }
 
-        // 新策略：由业务层决定每个section是否有页眉页脚
-        // 适配器只负责根据section配置来设置页眉页脚
-        if main_section_with_page_numbers.is_some() {
-            println!(
-                "【create_document】找到包含页码的section（索引: {}），正文页从第{}页开始",
-                sections_before_main,
-                sections_before_main + 1
-            );
-            println!("【create_document】页眉页脚的显示由业务层通过section配置决定");
-        } else {
-            println!("【create_document】未找到包含页码的section");
-        }
+        // // 新策略：由业务层决定每个section是否有页眉页脚
+        // // 适配器只负责根据section配置来设置页眉页脚
+        // if main_section_with_page_numbers.is_some() {
+        //     println!(
+        //         "【create_document】找到包含页码的section（索引: {}），正文页从第{}页开始",
+        //         sections_before_main,
+        //         sections_before_main + 1
+        //     );
+        //     println!("【create_document】页眉页脚的显示由业务层通过section配置决定");
+        // } else {
+        //     println!("【create_document】未找到包含页码的section");
+        // }
 
-        // 新策略：检查是否有任何section需要页眉页脚
-        // 如果有，则设置全局页眉页脚，但使用section break来控制显示
-        let mut has_any_headers_footers = false;
-        let mut first_section_with_headers_footers: Option<(usize, &Section)> = None;
+        // // 新策略：检查是否有任何section需要页眉页脚
+        // // 如果有，则设置全局页眉页脚，但使用section break来控制显示
+        // let mut has_any_headers_footers = false;
+        // let mut first_section_with_headers_footers: Option<(usize, &Section)> = None;
 
+        // for (section_index, section) in self.options.sections.iter().enumerate() {
+        //     let has_headers = section.headers.is_some();
+        //     let has_footers = section.footers.is_some();
+        //     if has_headers || has_footers {
+        //         has_any_headers_footers = true;
+        //         if first_section_with_headers_footers.is_none() {
+        //             first_section_with_headers_footers = Some((section_index, section));
+        //         }
+        //     }
+        // }
+
+        // if let Some((first_index, first_section)) = first_section_with_headers_footers {
+        //     println!(
+        //         "【create_document】找到第一个有页眉页脚的section（索引: {}），设置全局页眉页脚",
+        //         first_index
+        //     );
+
+        //     // 设置全局页眉页脚
+        //     if let Some(headers) = &first_section.headers {
+        //         let mut docx_header = docx_rs::Header::new();
+        //         for paragraph in &headers.default.children {
+        //             docx_header = docx_header.add_paragraph(paragraph.to_docx_paragraph(
+        //                 self.options.styles.clone(),
+        //                 self.options.footnotes.clone(),
+        //             ));
+        //         }
+        //         docx = docx.header(docx_header);
+        //         println!(
+        //             "【create_document】已设置全局页眉，包含 {} 个段落",
+        //             headers.default.children.len()
+        //         );
+        //     }
+
+        //     if let Some(footers) = &first_section.footers {
+        //         let mut docx_footer = docx_rs::Footer::new();
+        //         for paragraph in &footers.default.children {
+        //             docx_footer = docx_footer.add_paragraph(paragraph.to_docx_paragraph(
+        //                 self.options.styles.clone(),
+        //                 self.options.footnotes.clone(),
+        //             ));
+        //         }
+        //         docx = docx.footer(docx_footer);
+        //         println!(
+        //             "【create_document】已设置全局页脚，包含 {} 个段落",
+        //             footers.default.children.len()
+        //         );
+        //     }
+
+        //     // 关键：如果第一个有页眉页脚的section不是第一个section，
+        //     // 则使用空的first_header和first_footer来覆盖前面的页面
+        //     if first_index > 0 {
+        //         let empty_header = docx_rs::Header::new();
+        //         let empty_footer = docx_rs::Footer::new();
+        //         docx = docx.first_header(empty_header).first_footer(empty_footer);
+        //         println!("【create_document】已设置空的first_header和first_footer，前{}个section不显示页眉页脚", first_index);
+        //     }
+        // } else {
+        //     println!("【create_document】未找到有页眉页脚的section");
+        // }
+
+        // 应用页面属性（从第一个section获取）
+        // if let Some(first_section) = self.options.sections.first() {
+        //     if let Some(page_properties) = &first_section.properties.page {
+        //         // 尝试使用docx-rs的页面设置方法
+
+        //         // 设置页面大小
+        //         if let Some(page_size) = &page_properties.size {
+        //             // 尝试使用page_size方法
+        //             docx = docx.page_size(page_size.width as u32, page_size.height as u32);
+        //             println!(
+        //                 "【create_document】已应用页面大小: {}x{} twip",
+        //                 page_size.width, page_size.height
+        //             );
+        //         }
+
+        //         // 设置页面边距
+        //         if let Some(page_margin) = &page_properties.margin {
+        //             // 尝试使用page_margin方法
+        //             docx = docx.page_margin(
+        //                 docx_rs::PageMargin::new()
+        //                     .top(page_margin.top)
+        //                     .right(page_margin.right)
+        //                     .bottom(page_margin.bottom)
+        //                     .left(page_margin.left)
+        //                     .header(page_margin.header)
+        //                     .footer(page_margin.footer),
+        //             );
+        //             println!("【create_document】已应用页面边距: top={}, right={}, bottom={}, left={}, header={}, footer={}",
+        //                 page_margin.top, page_margin.right, page_margin.bottom,
+        //                 page_margin.left, page_margin.header, page_margin.footer);
+        //         }
+
+        //         println!("【create_document】页面属性已应用到文档");
+        //     }
+        // }
+
+        // 添加节
         for (section_index, section) in self.options.sections.iter().enumerate() {
+            let mut section_docx =
+                docx_rs::Section::new().section_type(docx_rs::SectionType::NextPage);
+            // if section_index == 0 {
+            //     section_docx = section_docx.section_type(docx_rs::SectionType::Continuous)
+            // } else {
+            //     section_docx = section_docx.section_type(docx_rs::SectionType::NextPage)
+            // }
+
             let has_headers = section.headers.is_some();
             let has_footers = section.footers.is_some();
             if has_headers || has_footers {
-                has_any_headers_footers = true;
-                if first_section_with_headers_footers.is_none() {
-                    first_section_with_headers_footers = Some((section_index, section));
+                // 设置全局页眉页脚
+                if let Some(headers) = &section.headers {
+                    let mut docx_header = docx_rs::Header::new();
+                    for paragraph in &headers.default.children {
+                        docx_header = docx_header.add_paragraph(paragraph.to_docx_paragraph(
+                            self.options.styles.clone(),
+                            self.options.footnotes.clone(),
+                        ));
+                    }
+                    section_docx = section_docx.header(docx_header);
+                    println!(
+                        "【create_document】已设置全局页眉，包含 {} 个段落",
+                        headers.default.children.len()
+                    );
+                }
+
+                if let Some(footers) = &section.footers {
+                    let mut docx_footer = docx_rs::Footer::new();
+                    for paragraph in &footers.default.children {
+                        docx_footer = docx_footer.add_paragraph(paragraph.to_docx_paragraph(
+                            self.options.styles.clone(),
+                            self.options.footnotes.clone(),
+                        ));
+                    }
+                    section_docx = section_docx.footer(docx_footer);
+                    println!(
+                        "【create_document】已设置全局页脚，包含 {} 个段落",
+                        footers.default.children.len()
+                    );
                 }
             }
-        }
 
-        if let Some((first_index, first_section)) = first_section_with_headers_footers {
-            println!(
-                "【create_document】找到第一个有页眉页脚的section（索引: {}），设置全局页眉页脚",
-                first_index
-            );
-
-            // 设置全局页眉页脚
-            if let Some(headers) = &first_section.headers {
-                let mut docx_header = docx_rs::Header::new();
-                for paragraph in &headers.default.children {
-                    docx_header = docx_header.add_paragraph(paragraph.to_docx_paragraph(
-                        self.options.styles.clone(),
-                        self.options.footnotes.clone(),
-                    ));
-                }
-                docx = docx.header(docx_header);
-                println!(
-                    "【create_document】已设置全局页眉，包含 {} 个段落",
-                    headers.default.children.len()
-                );
-            }
-
-            if let Some(footers) = &first_section.footers {
-                let mut docx_footer = docx_rs::Footer::new();
-                for paragraph in &footers.default.children {
-                    docx_footer = docx_footer.add_paragraph(paragraph.to_docx_paragraph(
-                        self.options.styles.clone(),
-                        self.options.footnotes.clone(),
-                    ));
-                }
-                docx = docx.footer(docx_footer);
-                println!(
-                    "【create_document】已设置全局页脚，包含 {} 个段落",
-                    footers.default.children.len()
-                );
-            }
-
-            // 关键：如果第一个有页眉页脚的section不是第一个section，
-            // 则使用空的first_header和first_footer来覆盖前面的页面
-            if first_index > 0 {
-                let empty_header = docx_rs::Header::new();
-                let empty_footer = docx_rs::Footer::new();
-                docx = docx.first_header(empty_header).first_footer(empty_footer);
-                println!("【create_document】已设置空的first_header和first_footer，前{}个section不显示页眉页脚", first_index);
-            }
-        } else {
-            println!("【create_document】未找到有页眉页脚的section");
-        }
-
-        // 应用页面属性（从第一个section获取）
-        if let Some(first_section) = self.options.sections.first() {
-            if let Some(page_properties) = &first_section.properties.page {
+            if let Some(page_properties) = &section.properties.page {
                 // 尝试使用docx-rs的页面设置方法
 
                 // 设置页面大小
                 if let Some(page_size) = &page_properties.size {
                     // 尝试使用page_size方法
-                    docx = docx.page_size(page_size.width as u32, page_size.height as u32);
+                    // section_docx = section_docx.page_size(page_size.width as u32, page_size.height as u32);
+                    section_docx = section_docx.page_size(
+                        docx_rs::PageSize::new()
+                            .size(page_size.width as u32, page_size.height as u32),
+                    );
                     println!(
                         "【create_document】已应用页面大小: {}x{} twip",
                         page_size.width, page_size.height
@@ -840,7 +923,7 @@ impl Document {
                 // 设置页面边距
                 if let Some(page_margin) = &page_properties.margin {
                     // 尝试使用page_margin方法
-                    docx = docx.page_margin(
+                    section_docx = section_docx.page_margin(
                         docx_rs::PageMargin::new()
                             .top(page_margin.top)
                             .right(page_margin.right)
@@ -856,46 +939,60 @@ impl Document {
 
                 println!("【create_document】页面属性已应用到文档");
             }
-        }
 
-        // 添加节
-        for (section_index, section) in self.options.sections.iter().enumerate() {
-            // 检查是否是包含页码的section（正文页section）
-            let is_main_section = if let Some(main_section) = main_section_with_page_numbers {
-                std::ptr::eq(section, main_section)
-            } else {
-                false
-            };
+            if let Some(footers) = &section.footers {
+                // 检查页脚是否包含页码
+                let has_page_numbers = footers.default.children.iter().any(|paragraph| {
+                    paragraph
+                        .runs
+                        .iter()
+                        .any(|run| matches!(run, RunType::PageNumber(_)))
+                });
 
-            // 检查当前section是否有页眉页脚配置
-            let has_headers = section.headers.is_some();
-            let has_footers = section.footers.is_some();
-
-            println!("【create_document】section #{}: has_headers={}, has_footers={}, is_main_section={}",
-                section_index, has_headers, has_footers, is_main_section);
-
-            // 如果是包含页码的section，设置页码重新开始计数
-            if is_main_section && sections_before_main > 0 {
-                // 设置页码从0开始，这样：
-                // - 标题页：页码0（隐藏）
-                // - 序言页：页码1（隐藏）
-                // - 正文页：页码2（显示，但需要在显示时减去前置页数来显示为"第1页"）
-                let page_num_type = docx_rs::PageNumType::new().start(0);
-                docx = docx.page_num_type(page_num_type);
-                println!("【create_document】已设置页码从0开始重新计数（section #{}），前{}个section的页码将被隐藏", section_index, sections_before_main);
+                if has_page_numbers {
+                    let page_num_type = docx_rs::PageNumType::new().start(1);
+                    section_docx = section_docx.page_num_type(page_num_type);
+                }
             }
 
-            // 如果不是第一个 section，在开始前添加分页符
-            if section_index > 0 {
-                docx = docx.add_paragraph(
-                    docx_rs::Paragraph::new()
-                        .add_run(docx_rs::Run::new().add_break(docx_rs::BreakType::Page)),
-                );
-                println!(
-                    "【create_document】在 section #{} 前添加分页符",
-                    section_index
-                );
-            }
+            // // 检查是否是包含页码的section（正文页section）
+            // let is_main_section = if let Some(main_section) = main_section_with_page_numbers {
+            //     std::ptr::eq(section, main_section)
+            // } else {
+            //     false
+            // };
+
+            // // 检查当前section是否有页眉页脚配置
+            // let has_headers = section.headers.is_some();
+            // let has_footers = section.footers.is_some();
+
+            // println!("【create_document】section #{}: has_headers={}, has_footers={}, is_main_section={}",
+            //     section_index, has_headers, has_footers, is_main_section);
+
+            // // 如果是包含页码的section，设置页码重新开始计数
+            // if is_main_section && sections_before_main > 0 {
+            //     // 设置页码从0开始，这样：
+            //     // - 标题页：页码0（隐藏）
+            //     // - 序言页：页码1（隐藏）
+            //     // - 正文页：页码2（显示，但需要在显示时减去前置页数来显示为"第1页"）
+            //     let page_num_type = docx_rs::PageNumType::new().start(0);
+            //     docx = docx.page_num_type(page_num_type);
+            //     println!("【create_document】已设置页码从0开始重新计数（section #{}），前{}个section的页码将被隐藏", section_index, sections_before_main);
+            // }
+
+            docx = docx.add_section(section_docx);
+
+            // // 如果不是第一个 section，在开始前添加分页符
+            // if section_index > 0 {
+            //     docx = docx.add_paragraph(
+            //         docx_rs::Paragraph::new()
+            //             .add_run(docx_rs::Run::new().add_break(docx_rs::BreakType::Page)),
+            //     );
+            //     println!(
+            //         "【create_document】在 section #{} 前添加分页符",
+            //         section_index
+            //     );
+            // }
 
             println!(
                 "【create_document】处理 section #{}, 包含 {} 个子元素",

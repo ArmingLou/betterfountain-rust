@@ -28,7 +28,7 @@ Metadata: {
         "chinaFormat": 3,
         "rmBlankLine": 1,
         "print_title_page": 1,
-        "print_preface_page": 0,
+        "print_preface_page": 1,
         "print_sections": 1,
         "print_synopsis": 1,
         "paper_size": "a4",

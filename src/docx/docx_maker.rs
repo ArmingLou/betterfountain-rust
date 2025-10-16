@@ -2330,7 +2330,8 @@ pub fn generate(
         let header = crate::docx::adapter::docx::Header::new();
         let mut headers = crate::docx::adapter::docx::Headers::new(header);
         headers.default.children.push(header_paragraph);
-        section_main.headers = Some(headers);
+        section_main.headers = Some(headers.clone());
+        section_main_no_page_num.headers = Some(headers);
     }
 
     // 添加页脚（有页码）
@@ -2347,6 +2348,12 @@ pub fn generate(
         }
 
         footer_paragraphs.push(footer_paragraph);
+    }
+    if !footer_paragraphs.is_empty() {
+        let footer = crate::docx::adapter::docx::Footer::new();
+        let mut footers = crate::docx::adapter::docx::Footers::new(footer);
+        footers.default.children = footer_paragraphs.clone();
+        section_main_no_page_num.footers = Some(footers);
     }
 
     // 添加页码
