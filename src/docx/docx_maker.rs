@@ -764,7 +764,8 @@ impl DocxContext {
 
         // 设置 notes 样式的运行属性
         let mut notes_run = crate::docx::adapter::docx::RunStyle::new();
-        notes_run.color = Some(print.note.color.clone());
+        // notes_run.color = Some(print.note.color.clone());
+        notes_run.size = Some((print.font_size) as usize);
         if print.note.italic {
             // 注意：这里需要在 RunStyle 中添加 italic 字段
             // 暂时跳过斜体设置
@@ -775,8 +776,21 @@ impl DocxContext {
             right: Some(action_indent),
         });
         // 注释使用相同的算法，但基于注释字体大小
-        notes_style.spacing = Some(spacing.clone());
+        
+        notes_style.spacing = Some(spacing.clone().line(convert_inches_to_twip(print.note_line_height)).line_rule(crate::docx::adapter::LineRuleType::AtLeast));
         styles.paragraph_styles.push(notes_style);
+        
+        //
+        let mut notes_ref_style = crate::docx::adapter::docx::CharacterStyle::new();
+        notes_ref_style.id = Some("FootnoteReference".to_string());
+        notes_ref_style.name = Some("FootnoteReference".to_string());
+        notes_ref_style.based_on = Some("Normal".to_string());
+         let mut notes_ref_run = crate::docx::adapter::docx::RunStyle::new();
+        // notes_ref_run.color = Some(print.note.color.clone());
+        notes_ref_run.size = Some((print.font_size*2.0*1.45)as usize);
+        // notes_ref_run.superScript = Some(false);
+        notes_ref_style.run = Some(notes_ref_run);
+        styles.character_styles.push(notes_ref_style);
 
         // 将样式添加到文档
         self.doc.options.styles = Some(styles);
@@ -3719,10 +3733,10 @@ pub fn generate(
                     }
 
                     // 创建脚注段落
-                    // let mut paragraph = crate::docx::adapter::docx::Paragraph::new(); //底部脚注内容使用单倍行距
-                    let mut paragraph =
-                        crate::docx::adapter::docx::Paragraph::new_with_spacing(spacing.clone().line(convert_inches_to_twip(options.print_profile.note_line_height)));
-                    // paragraph.style("notes");
+                    let mut paragraph = crate::docx::adapter::docx::Paragraph::new(); //底部脚注内容使用单倍行距
+                    // let mut paragraph =
+                    //     crate::docx::adapter::docx::Paragraph::new_with_spacing(spacing.clone().line(convert_inches_to_twip(options.print_profile.note_line_height)).line_rule(crate::docx::adapter::LineRuleType::AtLeast));
+                    paragraph.style("notes");
 
                     // 创建文本运行 - 参考原项目使用固定颜色 #868686
                     let mut footnote_options = create_basic_options_map("#868686");

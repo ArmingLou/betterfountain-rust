@@ -231,6 +231,7 @@ pub struct RunStyle {
     pub color: Option<String>,
     pub bold: Option<bool>,
     pub italic: Option<bool>,
+    pub superScript: Option<bool>,
 }
 
 impl RunStyle {
@@ -243,6 +244,7 @@ impl RunStyle {
             color: None,
             bold: None,
             italic: None,
+            superScript: None,
         }
     }
 }
@@ -617,6 +619,18 @@ impl Document {
                     if let Some(true) = run_style.italic {
                         run_property = run_property.italic();
                     }
+                    
+                    if let Some(size) = run_style.size {
+                        run_property = run_property.size(size);
+                    }
+                    
+                    if let Some(superScript) = run_style.superScript {
+                        if superScript {
+                            run_property = run_property.vert_align(docx_rs::VertAlignType::SuperScript)
+                        } else {
+                            run_property = run_property.vert_align(docx_rs::VertAlignType::Baseline)
+                        }
+                    }
 
                     // 直接设置字段而不是调用方法
                     docx_style.run_property = run_property;
@@ -676,6 +690,18 @@ impl Document {
 
                     if let Some(true) = run_style.italic {
                         run_property = run_property.italic();
+                    }
+                    
+                    if let Some(size) = run_style.size {
+                        run_property = run_property.size(size);
+                    }
+                    
+                    if let Some(superScript) = run_style.superScript {
+                        if superScript {
+                            run_property = run_property.vert_align(docx_rs::VertAlignType::SuperScript)
+                        } else {
+                            run_property = run_property.vert_align(docx_rs::VertAlignType::Baseline)
+                        }
                     }
 
                     // 直接设置字段而不是调用方法
@@ -1763,7 +1789,8 @@ impl RunTrait for TextRun {
                 footnote_content.len(),
                 footnotes.len()
             );
-            let mut footnote = docx_rs::Footnote::new();
+            let mut footnote =
+                docx_rs::Footnote::from(&docx_rs::FootnoteReference::new(*footnote_id));
 
             // 添加脚注内容 - 使用已经格式化好的TextRun
             if !footnote_content.is_empty() {
@@ -1773,8 +1800,12 @@ impl RunTrait for TextRun {
                     if i == 0 {
                         // 克隆并插入脚注编号
                         let mut pg_with_no = pg.clone();
+                        // pg_with_no.add_run_before(RunType::Text(TextRun::with_props(
+                        //     format!("[{}] ", footnote_id).as_str(),
+                        //     self.props.clone().color("#000000"),
+                        // )));
                         pg_with_no.add_run_before(RunType::Text(TextRun::with_props(
-                            format!("[{}] ", footnote_id).as_str(),
+                            " ",
                             self.props.clone().color("#000000"),
                         )));
                         footnote = footnote.add_content(
@@ -1800,8 +1831,12 @@ impl RunTrait for TextRun {
                         if i == 0 {
                             // 克隆并插入脚注编号
                             let mut pg_with_no = pg.clone();
+                            // pg_with_no.add_run_before(RunType::Text(TextRun::with_props(
+                            //     format!("[{}] ", footnote_id).as_str(),
+                            //     self.props.clone().color("#000000"),
+                            // )));
                             pg_with_no.add_run_before(RunType::Text(TextRun::with_props(
-                                format!("[{}] ", footnote_id).as_str(),
+                                " ",
                                 self.props.clone().color("#000000"),
                             )));
                             footnote = footnote.add_content(
@@ -1817,9 +1852,12 @@ impl RunTrait for TextRun {
             }
 
             // 创建带有脚注引用的运行
-            return docx_rs::Run::new().add_footnote_reference_with_size(
+            // return docx_rs::Run::new().add_footnote_reference_with_size(
+            //     footnote,
+            //     (self.props.size.unwrap_or(9) as f64 * 2.0 * 1.9) as usize, // 适配，字体磅数都要*2 ，比如实际的12磅实际传入参数需要24
+            // );
+            return docx_rs::Run::new().add_footnote_reference(
                 footnote,
-                (self.props.size.unwrap_or(9) as f64 * 2.0 * 1.9) as usize, // 适配，字体磅数都要*2 ，比如实际的12磅实际传入参数需要24
             );
         }
 
