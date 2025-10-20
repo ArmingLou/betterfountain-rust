@@ -1149,9 +1149,9 @@ impl DocxContext {
             if self.current_note.page_idx >= 0 {
                 // 如果正在处理notes，并且收集到底部，本行为notes开始内容
                 if (self.china_format == 1 || self.china_format == 3) && text.starts_with('△') {
-                    // 安全地移除第一个字符，处理 Unicode 字符
+                    // 安全地移除第一个字符，处理 Unicode 字符 '△'
                     if let Some(first_char) = text.chars().next() {
-                        text = text[first_char.len_utf8()..].to_string();
+                        text = text[(first_char.len_utf8()+1)..].to_string();//+1。包括△后的一个空格
                     }
                     self.cache_triangle = true;
                 }
@@ -1166,7 +1166,7 @@ impl DocxContext {
         {
             // 安全地移除第一个字符，处理 Unicode 字符
             if let Some(first_char) = text.chars().next() {
-                text = text[first_char.len_utf8()..].to_string();
+                text = text[(first_char.len_utf8()+1)..].to_string(); //+1。包括△后的一个空格
             }
         }
 
@@ -1570,7 +1570,7 @@ impl DocxContext {
                             // }
                             // 处理中文格式的三角符号缓存
                             if self.cache_triangle {
-                                elem_to_draw = format!("△{}", elem);
+                                elem_to_draw = format!("△ {}", elem);
                                 self.cache_triangle = false;
                             }
                         }
