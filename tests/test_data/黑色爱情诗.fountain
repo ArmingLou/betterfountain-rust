@@ -33,7 +33,7 @@ Metadata: {
         "print_synopsis": 1,
         "paper_size": "a4",
         "font_size": 12,
-        "character_spacing": 1,
+        "character_spacing": 2,
         "note_font_size": 9,
         "lines_per_page": 30,
         "top_margin": 1.19,
@@ -48,8 +48,8 @@ Metadata: {
     }
 }
 
-BR: sdflklsdjfls
-sdfsdf
+BR: hello world
+你谁懂啊谁史蒂夫
 Tr: topr
 BL: sdfldskf 
 TL: top l

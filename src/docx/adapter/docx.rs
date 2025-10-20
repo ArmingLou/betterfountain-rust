@@ -283,6 +283,7 @@ impl ParagraphStyle {
 pub struct ParagraphIndent {
     pub left: Option<i32>,
     pub right: Option<i32>,
+    pub first_line: Option<i32>,
 }
 
 impl ParagraphIndent {
@@ -291,6 +292,7 @@ impl ParagraphIndent {
         Self {
             left: None,
             right: None,
+            first_line: None,
         }
     }
 }
@@ -537,7 +539,8 @@ impl Document {
     /// 创建新的文档
     pub fn new() -> Self {
         Self {
-            docx: docx_rs::Docx::new(),
+            docx: docx_rs::Docx::new().settings(docx_rs::Settings::new()
+                     .balance_single_byte_double_byte_width(false)),
             options: DocumentOptions::new(),
         }
     }
@@ -638,13 +641,13 @@ impl Document {
 
                 // 添加段落属性
                 let mut paragraph_property = docx_rs::ParagraphProperty::new();
-
+                
                 // 设置缩进
                 if let Some(indent) = &paragraph_style.indent {
-                    if let (Some(left), Some(right)) = (indent.left, indent.right) {
+                    // if let (Some(left), Some(right), Some(first_line)) = (indent.left, indent.right, indent.first_line) {
                         paragraph_property =
-                            paragraph_property.indent(Some(left), None, Some(right), None);
-                    }
+                            paragraph_property.indent(indent.left, indent.first_line.map(|first_line| docx_rs::SpecialIndentType::FirstLine(first_line)), indent.right, None);
+                    // }
                 }
 
                 // 设置间距
@@ -719,6 +722,11 @@ impl Document {
     /// 创建 Docx.Document 实例
     pub fn create_document(&self) -> docx_rs::Docx {
         let mut docx = self.docx.clone();
+        
+        // let document = docx_rs::Document::new()
+        //  .doc_grid(docx_rs::DocGrid::with_empty().grid_type(docx_rs::DocGridType::Default)); // 关闭行/字符网格
+        
+        // docx = docx.document(document);
 
         // 设置文档属性
         // 注意：docx-rs 0.4.18-rc44 分支可能不支持 core_properties 方法
@@ -888,6 +896,7 @@ impl Document {
         for (section_index, section) in self.options.sections.iter().enumerate() {
             let mut section_docx =
                 docx_rs::Section::new().section_type(docx_rs::SectionType::NextPage);
+                // .doc_grid(docx_rs::DocGrid::with_empty().grid_type(docx_rs::DocGridType::Default)); // 关闭行/字符网格;
             // if section_index == 0 {
             //     section_docx = section_docx.section_type(docx_rs::SectionType::Continuous)
             // } else {
@@ -1288,6 +1297,7 @@ impl Paragraph {
             self.indent = Some(ParagraphIndent {
                 left: Some(left_indent),
                 right: None,
+                first_line: None,
             });
         }
         self
@@ -1301,6 +1311,21 @@ impl Paragraph {
             self.indent = Some(ParagraphIndent {
                 left: None,
                 right: Some(right_indent),
+                first_line: None,
+            });
+        }
+        self
+    }
+
+    /// 设置首行缩进
+    pub fn indent_first_line(&mut self, first_line_indent: i32) -> &mut Self {
+        if let Some(ref mut indent) = self.indent {
+            indent.first_line = Some(first_line_indent);
+        } else {
+            self.indent = Some(ParagraphIndent {
+                left: None,
+                right: None,
+                first_line: Some(first_line_indent),
             });
         }
         self
@@ -1422,6 +1447,8 @@ impl Paragraph {
 
         let mut left_i: Option<i32> = None;
         let mut right_i: Option<i32> = None;
+        let mut first_line_i: Option<docx_rs::SpecialIndentType> = None;
+        // let mut first_line_i: Option<i32> = None;
 
         if let Some(style) = &self.style {
             if let Some(ref styles) = mstyles {
@@ -1432,6 +1459,7 @@ impl Paragraph {
                             if let Some(indent) = &paragraph_style.indent {
                                 left_i = indent.left;
                                 right_i = indent.right;
+                                first_line_i = indent.first_line.map(|first_line| docx_rs::SpecialIndentType::FirstLine(first_line));
                             }
                             if let Some(sp) = &paragraph_style.spacing {
                                 paragraph = paragraph.line_spacing(sp.to_docx_line_spacing());
@@ -1453,10 +1481,15 @@ impl Paragraph {
             if let Some(right) = indent.right {
                 right_i = Some(right);
             }
+            
+            if let Some(first) = indent.first_line {
+                first_line_i = Some(docx_rs::SpecialIndentType::FirstLine(first));
+            }
+            
         }
         paragraph = paragraph.indent(
             left_i,  // 使用 or 方法替代 || 运算符
-            None,    // 首行缩进
+            first_line_i,    // 首行缩进
             right_i, // 使用 or 方法替代缺失的 rightI
             None,
         );

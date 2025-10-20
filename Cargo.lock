@@ -200,7 +200,7 @@ checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 [[package]]
 name = "docx-rs"
 version = "0.4.18-rc19"
-source = "git+https://github.com/ArmingLou/docx-rs.git#641293ad6b0a47ff93f974ca86d32df9dcff41fe"
+source = "git+https://github.com/ArmingLou/docx-rs.git#fc40dae4c2c8c2b9b7ac583291fce16bc3fd53e3"
 dependencies = [
  "base64",
  "image",

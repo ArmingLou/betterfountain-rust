@@ -427,7 +427,11 @@ impl DocxContext {
             font: Some(
                 font_names
                     .get("bold")
-                    .unwrap_or(&"Courier Prime".to_string())
+                    .unwrap_or(
+                        font_names
+                            .get("normal")
+                            .unwrap_or(&"Courier Prime".to_string()),
+                    )
                     .clone(),
             ),
             bold: Some(!options.found_font_bold),
@@ -440,7 +444,11 @@ impl DocxContext {
             font: Some(
                 font_names
                     .get("italic")
-                    .unwrap_or(&"Courier Prime".to_string())
+                    .unwrap_or(
+                        font_names
+                            .get("normal")
+                            .unwrap_or(&"Courier Prime".to_string()),
+                    )
                     .clone(),
             ),
             bold: Some(false),
@@ -453,7 +461,11 @@ impl DocxContext {
             font: Some(
                 font_names
                     .get("bold_italic")
-                    .unwrap_or(&"Courier Prime".to_string())
+                    .unwrap_or(
+                        font_names
+                            .get("normal")
+                            .unwrap_or(&"Courier Prime".to_string()),
+                    )
                     .clone(),
             ),
             bold: Some(!options.found_font_bold_italic),
@@ -699,6 +711,7 @@ impl DocxContext {
         scene_style.indent = Some(crate::docx::adapter::docx::ParagraphIndent {
             left: Some(scene_indent),
             right: Some(scene_indent),
+            first_line: None,
         });
         scene_style.spacing = Some(spacing.clone());
         styles.paragraph_styles.push(scene_style);
@@ -712,7 +725,13 @@ impl DocxContext {
         action_style.indent = Some(crate::docx::adapter::docx::ParagraphIndent {
             left: Some(action_indent),
             right: Some(action_indent),
+            first_line: None,
         });
+         let mut action_run = crate::docx::adapter::docx::RunStyle::new();
+        // action_style.color = Some(print.note.color.clone());
+        // action_run.size = Some((print.font_size) as usize);
+        action_run.font = self.run_normal.font.clone();
+        action_style.run = Some(action_run);
         action_style.spacing = Some(spacing.clone());
         styles.paragraph_styles.push(action_style);
 
@@ -725,6 +744,7 @@ impl DocxContext {
         character_style.indent = Some(crate::docx::adapter::docx::ParagraphIndent {
             left: Some(character_indent),
             right: Some(character_indent),
+            first_line: None,
         });
         character_style.spacing = Some(spacing.clone());
         styles.paragraph_styles.push(character_style);
@@ -738,6 +758,7 @@ impl DocxContext {
         dial_style.indent = Some(crate::docx::adapter::docx::ParagraphIndent {
             left: Some(dialogue_indent),
             right: Some(dialogue_indent),
+            first_line: None,
         });
         dial_style.spacing = Some(spacing.clone());
         styles.paragraph_styles.push(dial_style);
@@ -751,6 +772,7 @@ impl DocxContext {
         parenthetical_style.indent = Some(crate::docx::adapter::docx::ParagraphIndent {
             left: Some(parenthetical_indent),
             right: Some(parenthetical_indent),
+            first_line: None,
         });
         parenthetical_style.spacing = Some(spacing.clone());
         styles.paragraph_styles.push(parenthetical_style);
@@ -774,20 +796,27 @@ impl DocxContext {
         notes_style.indent = Some(crate::docx::adapter::docx::ParagraphIndent {
             left: Some(action_indent),
             right: Some(action_indent),
+            // first_line: Some(convert_inches_to_twip(2.0 * print.font_width)),
+            first_line: None,
         });
         // 注释使用相同的算法，但基于注释字体大小
-        
-        notes_style.spacing = Some(spacing.clone().line(convert_inches_to_twip(print.note_line_height)).line_rule(crate::docx::adapter::LineRuleType::AtLeast));
+
+        notes_style.spacing = Some(
+            spacing
+                .clone()
+                .line(convert_inches_to_twip(print.note_line_height))
+                .line_rule(crate::docx::adapter::LineRuleType::AtLeast),
+        );
         styles.paragraph_styles.push(notes_style);
-        
+
         //
         let mut notes_ref_style = crate::docx::adapter::docx::CharacterStyle::new();
         notes_ref_style.id = Some("FootnoteReference".to_string());
         notes_ref_style.name = Some("FootnoteReference".to_string());
         notes_ref_style.based_on = Some("Normal".to_string());
-         let mut notes_ref_run = crate::docx::adapter::docx::RunStyle::new();
+        let mut notes_ref_run = crate::docx::adapter::docx::RunStyle::new();
         // notes_ref_run.color = Some(print.note.color.clone());
-        notes_ref_run.size = Some((print.font_size*2.0*1.45)as usize);
+        notes_ref_run.size = Some((print.font_size * 2.0 * 1.45) as usize);
         // notes_ref_run.superScript = Some(false);
         notes_ref_style.run = Some(notes_ref_run);
         styles.character_styles.push(notes_ref_style);
@@ -3734,9 +3763,12 @@ pub fn generate(
 
                     // 创建脚注段落
                     let mut paragraph = crate::docx::adapter::docx::Paragraph::new(); //底部脚注内容使用单倍行距
-                    // let mut paragraph =
-                    //     crate::docx::adapter::docx::Paragraph::new_with_spacing(spacing.clone().line(convert_inches_to_twip(options.print_profile.note_line_height)).line_rule(crate::docx::adapter::LineRuleType::AtLeast));
+                                                                                      // let mut paragraph =
+                                                                                      //     crate::docx::adapter::docx::Paragraph::new_with_spacing(spacing.clone().line(convert_inches_to_twip(options.print_profile.note_line_height)).line_rule(crate::docx::adapter::LineRuleType::AtLeast));
                     paragraph.style("notes");
+                    if k == 0 {
+                        paragraph.indent_first_line(convert_inches_to_twip(2.0 * print.font_width));
+                    }
 
                     // 创建文本运行 - 参考原项目使用固定颜色 #868686
                     let mut footnote_options = create_basic_options_map("#868686");
