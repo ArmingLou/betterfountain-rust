@@ -369,7 +369,7 @@ pub struct DocxContext {
     pub run_notes: RunProps,
     pub rm_blank_line: i32,
     pub china_format: i32,
-    pub cache_triangle: bool,
+    pub cache_triangle: &'static str,
     pub force_note_orig: bool,
     pub current_note: CurrentNote,
     pub notes_len: usize,
@@ -516,7 +516,7 @@ impl DocxContext {
             run_notes,
             rm_blank_line,
             china_format,
-            cache_triangle: false,
+            cache_triangle: "",
             force_note_orig: false,
             current_note: CurrentNote::default(),
             notes_len: 0,
@@ -1148,20 +1148,19 @@ impl DocxContext {
                                 // }
             if self.current_note.page_idx >= 0 {
                 // 如果正在处理notes，并且收集到底部，本行为notes开始内容
-                if (self.china_format == 1 || self.china_format == 3) && text.starts_with('△') {
+                if text.starts_with('△') || text.starts_with('♪') {
+                    self.cache_triangle = if text.starts_with('△') { "△" } else { "♪" };
                     // 安全地移除第一个字符，处理 Unicode 字符 '△'
                     if let Some(first_char) = text.chars().next() {
                         text = text[(first_char.len_utf8()+1)..].to_string();//+1。包括△后的一个空格
                     }
-                    self.cache_triangle = true;
                 }
             } else {
-                self.cache_triangle = false;
+                self.cache_triangle = "";
             }
         }
 
-        if (self.china_format == 1 || self.china_format == 3)
-            && text.starts_with('△')
+        if (text.starts_with('△') || text.starts_with('♪'))
             && self.force_note_orig
         {
             // 安全地移除第一个字符，处理 Unicode 字符
@@ -1569,9 +1568,9 @@ impl DocxContext {
                             //     println!("【text2】不在脚注中，正常处理: \"{}\"", elem);
                             // }
                             // 处理中文格式的三角符号缓存
-                            if self.cache_triangle {
-                                elem_to_draw = format!("△ {}", elem);
-                                self.cache_triangle = false;
+                            if !self.cache_triangle.is_empty() {
+                                elem_to_draw = format!("{} {}", self.cache_triangle, elem);
+                                self.cache_triangle = "";
                             }
                         }
                     } else {
@@ -3661,10 +3660,20 @@ pub fn generate(
 
                 // 设置缩进
                 paragraph.indent(action_indent);
+                
+                
+                // 处理文本
+                let mut text = line.text.clone();
+                text = if_reset_format(text, line);
+
+                // 歌词处理
+                if token_type == "lyric" {
+                    text = format!("♪ {}", text);
+                }
 
                 // 创建文本运行
                 let text_runs = doc.text2(
-                    &line.text,
+                    &text,
                     &default_text_options,
                     if bottom_notes {
                         Some(&mut current_line_notes)
