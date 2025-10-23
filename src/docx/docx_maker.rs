@@ -794,7 +794,7 @@ impl DocxContext {
         }
         notes_style.run = Some(notes_run);
         notes_style.indent = Some(crate::docx::adapter::docx::ParagraphIndent {
-            left: Some(action_indent),
+            left: Some(action_indent + convert_inches_to_twip(2.0 * print.font_width)),
             right: Some(action_indent),
             // first_line: Some(convert_inches_to_twip(2.0 * print.font_width)),
             first_line: None,
@@ -3776,7 +3776,7 @@ pub fn generate(
                                                                                       //     crate::docx::adapter::docx::Paragraph::new_with_spacing(spacing.clone().line(convert_inches_to_twip(options.print_profile.note_line_height)).line_rule(crate::docx::adapter::LineRuleType::AtLeast));
                     paragraph.style("notes");
                     if k == 0 {
-                        paragraph.indent_first_line(convert_inches_to_twip(2.0 * print.font_width));
+                        paragraph.indent_first_line(convert_inches_to_twip(-2.0 * print.font_width)); //负数，悬挂缩进
                     }
 
                     // 创建文本运行 - 参考原项目使用固定颜色 #868686

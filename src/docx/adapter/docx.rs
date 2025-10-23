@@ -283,7 +283,7 @@ impl ParagraphStyle {
 pub struct ParagraphIndent {
     pub left: Option<i32>,
     pub right: Option<i32>,
-    pub first_line: Option<i32>,
+    pub first_line: Option<i32>, // 负数表示悬挂缩进【hanging】
 }
 
 impl ParagraphIndent {
@@ -646,7 +646,7 @@ impl Document {
                 if let Some(indent) = &paragraph_style.indent {
                     // if let (Some(left), Some(right), Some(first_line)) = (indent.left, indent.right, indent.first_line) {
                         paragraph_property =
-                            paragraph_property.indent(indent.left, indent.first_line.map(|first_line| docx_rs::SpecialIndentType::FirstLine(first_line)), indent.right, None);
+                            paragraph_property.indent(indent.left, indent.first_line.map(|first_line| if first_line > 0 { docx_rs::SpecialIndentType::FirstLine(first_line) } else { docx_rs::SpecialIndentType::Hanging(-first_line) }), indent.right, None);
                     // }
                 }
 
@@ -1459,7 +1459,7 @@ impl Paragraph {
                             if let Some(indent) = &paragraph_style.indent {
                                 left_i = indent.left;
                                 right_i = indent.right;
-                                first_line_i = indent.first_line.map(|first_line| docx_rs::SpecialIndentType::FirstLine(first_line));
+                                first_line_i = indent.first_line.map(|first_line| if first_line > 0 { docx_rs::SpecialIndentType::FirstLine(first_line) } else { docx_rs::SpecialIndentType::Hanging(-first_line) });
                             }
                             if let Some(sp) = &paragraph_style.spacing {
                                 paragraph = paragraph.line_spacing(sp.to_docx_line_spacing());
@@ -1483,7 +1483,7 @@ impl Paragraph {
             }
             
             if let Some(first) = indent.first_line {
-                first_line_i = Some(docx_rs::SpecialIndentType::FirstLine(first));
+                first_line_i = Some(if first > 0 { docx_rs::SpecialIndentType::FirstLine(first) } else { docx_rs::SpecialIndentType::Hanging(-first) });
             }
             
         }
