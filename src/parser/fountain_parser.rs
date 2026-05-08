@@ -145,6 +145,7 @@ pub struct FountainParser {
     current_outline_note_linenum: Vec<usize>,
     nested_comments: i32,
     nested_notes: i32,
+    need_process_outline_note: i32,
     regex: HashMap<String, Regex>,
     title_page_display: HashMap<String, TitleKeywordFormat>,
 }
@@ -174,6 +175,7 @@ impl FountainParser {
             current_outline_note_linenum: Vec::new(),
             nested_comments: 0,
             nested_notes: 0,
+need_process_outline_note: 0,
             regex: HashMap::new(),
             title_page_display: HashMap::new(),
         };
@@ -693,6 +695,7 @@ impl FountainParser {
                         self.nested_notes += 1;
                         if self.nested_notes == 1 {
                             // 需要处理大纲注解
+                            self.need_process_outline_note += 1;
                             self.current_outline_note_text.push(String::new());
                             self.current_outline_note_linenum.push(line_num);
                             if cfg.print_notes {
@@ -840,7 +843,7 @@ impl FountainParser {
         self.scene_number = 1;
         self.nested_comments = 0;
         self.nested_notes = 0;
-        let mut _need_process_outline_note = 0;
+        self.need_process_outline_note = 0;
         self.current_outline_note_text.clear();
         self.current_outline_note_linenum.clear();
         self.text_display = String::new();
@@ -2415,9 +2418,9 @@ impl FountainParser {
             self.push_token(self.create_token(None, None, None, None, "dual_dialogue_end"));
         }
 
-        if _need_process_outline_note > 0 {
+        if self.need_process_outline_note > 0 {
             self.process_inline_notes();
-            _need_process_outline_note = 0;
+            self.need_process_outline_note = 0;
         }
 
         self.update_previous_scene_length(); // 统计最后一个场景的时长
