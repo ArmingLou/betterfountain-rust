@@ -1817,6 +1817,12 @@ if let Some(index) = self.last_scen_structure_token_index {
                                     if let Some(index) = self.last_scen_structure_token_index {
                                         if let Some(last_scen) = self.result.properties.structure.get(index) {
                                             structs.push(serde_json::to_value(last_scen).unwrap());
+                                            // 同时添加 children 中的场景
+                                            for child in &last_scen.children {
+                                                if child.isscene {
+                                                    structs.push(serde_json::to_value(child).unwrap());
+                                                }
+                                            }
                                         }
                                     }
 
@@ -1837,12 +1843,22 @@ if let Some(index) = self.last_scen_structure_token_index {
                                     if let Some(index_pre) = self.last_scen_structure_token_index_pre {
                                         if let Some(last_scen_pre) = self.result.properties.structure.get(index_pre) {
                                             structs.push(serde_json::to_value(last_scen_pre).unwrap());
+                                            for child in &last_scen_pre.children {
+                                                if child.isscene {
+                                                    structs.push(serde_json::to_value(child).unwrap());
+                                                }
+                                            }
                                         }
                                     }
 
                                     if let Some(index) = self.last_scen_structure_token_index {
                                         if let Some(last_scen) = self.result.properties.structure.get(index) {
                                             structs.push(serde_json::to_value(last_scen).unwrap());
+                                            for child in &last_scen.children {
+                                                if child.isscene {
+                                                    structs.push(serde_json::to_value(child).unwrap());
+                                                }
+                                            }
                                         }
                                     }
 
