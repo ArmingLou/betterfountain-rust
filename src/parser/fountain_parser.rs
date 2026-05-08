@@ -295,50 +295,35 @@ need_process_outline_note: 0,
             self.play_time_sec += time;
             token.play_time_sec = self.play_time_sec;
 
-if let Some(index) = self.last_scen_structure_token_index {
-                let last_scen_structure_token = self.result.properties.structure.get_mut(index).unwrap();
-                let current_scene_id = if self.last_scen_in_children {
-                    last_scen_structure_token.children.last().and_then(|c| c.id.clone())
-                } else {
-                    last_scen_structure_token.id.clone()
-                };
-                let mut need = false;
-                if self.shot_cut > 0 {
-                    if let Some(last_map) = self.shot_cut_strct_tokens.last() {
-                        if let Some(scene_ids) = last_map.get("scene_ids") {
-                            if let Some(scene_ids_array) = scene_ids.as_array() {
-                                if let Some(id) = &current_scene_id {
-                                    let id_str = serde_json::Value::String(id.clone());
-                                    need = scene_ids_array.contains(&id_str);
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if need {
-                    if let Some(last_map) = self.shot_cut_strct_tokens.last_mut() {
-                        let duration = last_map
-                            .get("duration")
-                            .and_then(|v| v.as_f64())
-                            .unwrap_or(0.0)
-                            + time;
-                        last_map.insert(
-                            "duration".to_string(),
-                            serde_json::to_value(duration).unwrap(),
-                        );
-                    }
-                } else {
-                    last_scen_structure_token.duration_sec += time;
-                    if self.last_scen_in_children {
-                        if let Some(last_child) = last_scen_structure_token.children.last_mut() {
-                            if last_child.isscene {
-                                last_child.duration_sec += time;
-                            }
+        if let Some(ref scene_id) = self.last_scen_id {
+            let mut need = false;
+            if self.shot_cut > 0 {
+                if let Some(last_map) = self.shot_cut_strct_tokens.last() {
+                    if let Some(scene_ids) = last_map.get("scene_ids") {
+                        if let Some(scene_ids_array) = scene_ids.as_array() {
+                            let id_str = serde_json::Value::String(scene_id.clone());
+                            need = scene_ids_array.contains(&id_str);
                         }
                     }
                 }
             }
+
+            if need {
+                if let Some(last_map) = self.shot_cut_strct_tokens.last_mut() {
+                    let duration = last_map
+                        .get("duration")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.0)
+                        + time;
+                    last_map.insert(
+                        "duration".to_string(),
+                        serde_json::to_value(duration).unwrap(),
+                    );
+                }
+            } else {
+                Self::add_duration_to_scene(&mut self.result.properties.structure, scene_id, time);
+            }
+        }
 
             if let Some(last_chartor_structure_token) = &mut self.last_chartor_structure_token {
                 last_chartor_structure_token.duration_sec += time;
@@ -376,51 +361,38 @@ if let Some(index) = self.last_scen_structure_token_index {
             token.play_time_sec = self.play_time_sec;
 
 // 更新场景持续时间
-if let Some(index) = self.last_scen_structure_token_index {
-                let last_scen_structure_token = self.result.properties.structure.get_mut(index).unwrap();
-                // 检查当前场景ID是否在shot_cut组中
-                // 如果场景在children中，使用children中最后一个场景的ID
-                let current_scene_id = if self.last_scen_in_children {
-                    last_scen_structure_token.children.last().and_then(|c| c.id.clone())
-                } else {
-                    last_scen_structure_token.id.clone()
-                };
-                let mut need = false;
-                if self.shot_cut > 0 {
-                    if let Some(last_map) = self.shot_cut_strct_tokens.last() {
-                        if let Some(scene_ids) = last_map.get("scene_ids") {
-                            if let Some(scene_ids_array) = scene_ids.as_array() {
-                                if let Some(id) = &current_scene_id {
-                                    let id_str = serde_json::Value::String(id.clone());
-                                    need = scene_ids_array.contains(&id_str);
-                                }
-                            }
+        if let Some(ref scene_id) = self.last_scen_id {
+            let mut need = false;
+            if self.shot_cut > 0 {
+                if let Some(last_map) = self.shot_cut_strct_tokens.last() {
+                    if let Some(scene_ids) = last_map.get("scene_ids") {
+                        if let Some(scene_ids_array) = scene_ids.as_array() {
+                            let id_str = serde_json::Value::String(scene_id.clone());
+                            need = scene_ids_array.contains(&id_str);
                         }
                     }
                 }
+            }
 
-                if need {
-                    if let Some(last_map) = self.shot_cut_strct_tokens.last_mut() {
-                        let duration = last_map
-                            .get("duration")
-                            .and_then(|v| v.as_f64())
-                            .unwrap_or(0.0)
-                            + time;
-                        last_map.insert(
-                            "duration".to_string(),
-                            serde_json::to_value(duration).unwrap(),
-                        );
-                    }
-                } else {
-                    last_scen_structure_token.duration_sec += time;
-                    if self.last_scen_in_children {
-                        if let Some(last_child) = last_scen_structure_token.children.last_mut() {
-                            if last_child.isscene {
-                                last_child.duration_sec += time;
-                            }
-                        }
-                    }
+            if need {
+                if let Some(last_map) = self.shot_cut_strct_tokens.last_mut() {
+                    let duration = last_map
+                        .get("duration")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.0)
+                        + time;
+                    last_map.insert(
+                        "duration".to_string(),
+                        serde_json::to_value(duration).unwrap(),
+                    );
                 }
+            } else {
+                Self::add_duration_to_scene(&mut self.result.properties.structure, scene_id, time);
+            }
+        }
+
+            if let Some(last_chartor_structure_token) = &mut self.last_chartor_structure_token {
+                last_chartor_structure_token.duration_sec += time;
             }
         }
         token
@@ -589,6 +561,19 @@ if let Some(index) = self.last_scen_structure_token_index {
         }
 
         current_section
+    }
+
+    fn add_duration_to_scene(structure: &mut Vec<StructToken>, scene_id: &str, time: f64) -> bool {
+        for token in structure.iter_mut() {
+            if token.id.as_deref() == Some(scene_id) {
+                token.duration_sec += time;
+                return true;
+            }
+            if Self::add_duration_to_scene(&mut token.children, scene_id, time) {
+                return true;
+            }
+        }
+        false
     }
 
     // 查找指定深度下最新的scene
@@ -1667,13 +1652,20 @@ if let Some(index) = self.last_scen_structure_token_index {
                                     this_token.line
                                 ));
 
-                                // 找到父节点并添加子节点
-                                for parent in &mut self.result.properties.structure {
-                                    if parent.id == level.id {
-                                        parent.children.push(cobj.clone());
-                                        break;
+                                // 递归查找父节点并添加子节点
+                                fn find_and_push(parents: &mut Vec<StructToken>, target_id: &str, child: &StructToken) -> bool {
+                                    for p in parents.iter_mut() {
+                                        if p.id.as_deref() == Some(target_id) {
+                                            p.children.push(child.clone());
+                                            return true;
+                                        }
+                                        if find_and_push(&mut p.children, target_id, child) {
+                                            return true;
+                                        }
                                     }
+                                    false
                                 }
+                                find_and_push(&mut self.result.properties.structure, level.id.as_deref().unwrap_or(""), &cobj);
                             } else {
                                 cobj.id = Some(format!("/{}", this_token.line));
                                 self.result.properties.structure.push(cobj.clone());
@@ -2297,13 +2289,20 @@ if let Some(index) = self.last_scen_structure_token_index {
                                         this_token.line
                                     ));
 
-                                    // 找到父节点并添加子节点
-                                    for parent in &mut self.result.properties.structure {
-                                        if parent.id == level.id {
-                                            parent.children.push(cobj);
-                                            break;
+                                    // 递归查找父节点并添加子节点
+                                    fn find_and_push_section(parents: &mut Vec<StructToken>, target_id: &str, child: StructToken) -> bool {
+                                        for p in parents.iter_mut() {
+                                            if p.id.as_deref() == Some(target_id) {
+                                                p.children.push(child);
+                                                return true;
+                                            }
+                                            if find_and_push_section(&mut p.children, target_id, child.clone()) {
+                                                return true;
+                                            }
                                         }
+                                        false
                                     }
+                                    find_and_push_section(&mut self.result.properties.structure, level.id.as_deref().unwrap_or(""), cobj);
                                 } else {
                                     cobj.id = Some(format!("/{}", this_token.line));
                                     self.result.properties.structure.push(cobj);
@@ -2488,19 +2487,7 @@ if let Some(index) = self.last_scen_structure_token_index {
                     }
                     let average_duration = duration / unique_scene_ids.len() as f64;
                     for scene_id in &unique_scene_ids {
-                        for token in &mut self.result.properties.structure {
-                            if token.id.as_ref() == Some(scene_id) {
-                                token.duration_sec += average_duration;
-                                break;
-                            }
-                            for child in &mut token.children {
-                                if child.id.as_ref() == Some(scene_id) {
-                                    child.duration_sec += average_duration;
-                                    token.duration_sec += average_duration;
-                                    break;
-                                }
-                            }
-                        }
+                        Self::add_duration_to_scene(&mut self.result.properties.structure, scene_id, average_duration);
                     }
                 }
             }
