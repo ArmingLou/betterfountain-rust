@@ -2490,17 +2490,20 @@ if let Some(index) = self.last_scen_structure_token_index {
                             scene_ids.push(id.to_string());
                         }
                     }
+                    eprintln!("shot_cut 平分: duration={}, count={}, avg={}, ids={:?}", duration, structs_array.len(), average_duration, scene_ids);
                     // 更新 structure 中的场景
                     for scene_id in &scene_ids {
                         for token in &mut self.result.properties.structure {
                             if token.id.as_ref() == Some(scene_id) {
                                 token.duration_sec += average_duration;
+                                eprintln!("  更新顶层场景: {}", scene_id);
                                 break;
                             }
                             // 同时检查 children
                             for child in &mut token.children {
                                 if child.id.as_ref() == Some(scene_id) {
                                     child.duration_sec += average_duration;
+                                    eprintln!("  更新子场景: {}", scene_id);
                                     break;
                                 }
                             }
