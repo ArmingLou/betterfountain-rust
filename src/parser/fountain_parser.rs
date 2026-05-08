@@ -129,8 +129,8 @@ pub struct FountainParser {
     current_depth: usize,
     scene_number: usize,
     play_time_sec: f64,
-    last_scen_structure_token: Option<StructToken>,
-    last_scen_structure_token_pre: Option<StructToken>,
+    last_scen_structure_token_index: Option<usize>,
+    last_scen_structure_token_index_pre: Option<usize>,
     last_chartor_structure_token: Option<StructToken>,
     force_not_dual: bool,
     take_count: usize,
@@ -159,8 +159,8 @@ impl FountainParser {
             current_depth: 0,
             scene_number: 1,
             play_time_sec: 0.0,
-            last_scen_structure_token: None,
-            last_scen_structure_token_pre: None,
+            last_scen_structure_token_index: None,
+            last_scen_structure_token_index_pre: None,
             last_chartor_structure_token: None,
             force_not_dual: true,
             take_count: 1,
@@ -289,7 +289,10 @@ need_process_outline_note: 0,
             self.play_time_sec += time;
             token.play_time_sec = self.play_time_sec;
 
-            if let Some(last_scen_structure_token) = &mut self.last_scen_structure_token {
+if let Some(index) = self.last_scen_structure_token_index {
+                let last_scen_structure_token = self.result.properties.structure.get_mut(index).unwrap();
+                // 先克隆需要比较的值，避免move问题
+                let token_json = serde_json::to_value(&*last_scen_structure_token).unwrap();
                 let mut need = false;
                 if self.shot_cut > 0 {
                     // 检查lastScenStructureToken是否已在当前shotCutStrctTokens中
@@ -297,10 +300,7 @@ need_process_outline_note: 0,
                         if let Some(structs) = last_map.get("structs") {
                             if let Some(structs_array) = structs.as_array() {
                                 for struct_token in structs_array {
-                                    if struct_token
-                                        == &serde_json::to_value(&last_scen_structure_token)
-                                            .unwrap()
-                                    {
+                                    if struct_token == &token_json {
                                         need = true;
                                         break;
                                     }
@@ -362,18 +362,17 @@ need_process_outline_note: 0,
             self.play_time_sec += time;
             token.play_time_sec = self.play_time_sec;
 
-            // 更新场景持续时间
-            if let Some(last_scen_structure_token) = &mut self.last_scen_structure_token {
+// 更新场景持续时间
+            if let Some(index) = self.last_scen_structure_token_index {
+                let last_scen_structure_token = self.result.properties.structure.get_mut(index).unwrap();
+                let token_json = serde_json::to_value(&*last_scen_structure_token).unwrap();
                 let mut need = false;
                 if self.shot_cut > 0 {
                     if let Some(last_map) = self.shot_cut_strct_tokens.last() {
                         if let Some(structs) = last_map.get("structs") {
                             if let Some(structs_array) = structs.as_array() {
                                 for struct_token in structs_array {
-                                    if struct_token
-                                        == &serde_json::to_value(&last_scen_structure_token)
-                                            .unwrap()
-                                    {
+                                    if struct_token == &token_json {
                                         need = true;
                                         break;
                                     }
@@ -851,8 +850,8 @@ need_process_outline_note: 0,
         let mut ignored_last_token = false;
         self.last_chartor_structure_token = None;
         let mut last_title_page_token: Option<ScriptToken> = None;
-        self.last_scen_structure_token = None;
-        self.last_scen_structure_token_pre = None;
+        self.last_scen_structure_token_index = None;
+        self.last_scen_structure_token_index_pre = None;
         let mut last_character_index = 0;
         let mut _previous_character: Option<String> = None;
 
@@ -1657,8 +1656,8 @@ need_process_outline_note: 0,
                             }
                         }
 
-                        self.last_scen_structure_token_pre = self.last_scen_structure_token.clone();
-                        self.last_scen_structure_token = Some(cobj.clone());
+                        self.last_scen_structure_token_index_pre = self.last_scen_structure_token_index;
+                        self.last_scen_structure_token_index = Some(self.result.properties.structure.len() - 1);
 
                         if self.shot_cut > 0 {
                             if let Some(last_map) = self.shot_cut_strct_tokens.last_mut() {
@@ -1794,8 +1793,10 @@ need_process_outline_note: 0,
                                     );
 
                                     let mut structs = Vec::new();
-                                    if let Some(last_scen) = &self.last_scen_structure_token {
-                                        structs.push(serde_json::to_value(last_scen).unwrap());
+                                    if let Some(index) = self.last_scen_structure_token_index {
+                                        if let Some(last_scen) = self.result.properties.structure.get(index) {
+                                            structs.push(serde_json::to_value(last_scen).unwrap());
+                                        }
                                     }
 
                                     shot_cut_map.insert(
@@ -1812,13 +1813,16 @@ need_process_outline_note: 0,
                                     );
 
                                     let mut structs = Vec::new();
-                                    if let Some(last_scen_pre) = &self.last_scen_structure_token_pre
-                                    {
-                                        structs.push(serde_json::to_value(last_scen_pre).unwrap());
+                                    if let Some(index_pre) = self.last_scen_structure_token_index_pre {
+                                        if let Some(last_scen_pre) = self.result.properties.structure.get(index_pre) {
+                                            structs.push(serde_json::to_value(last_scen_pre).unwrap());
+                                        }
                                     }
 
-                                    if let Some(last_scen) = &self.last_scen_structure_token {
-                                        structs.push(serde_json::to_value(last_scen).unwrap());
+                                    if let Some(index) = self.last_scen_structure_token_index {
+                                        if let Some(last_scen) = self.result.properties.structure.get(index) {
+                                            structs.push(serde_json::to_value(last_scen).unwrap());
+                                        }
                                     }
 
                                     shot_cut_map.insert(
@@ -2077,8 +2081,8 @@ need_process_outline_note: 0,
                         last_character_index = self.result.tokens.len();
 
                         // 对话角色加入结构树
-                        if let Some(last_scen_structure_token) = &mut self.last_scen_structure_token
-                        {
+                        if let Some(index) = self.last_scen_structure_token_index {
+                            if let Some(last_scen_structure_token) = self.result.properties.structure.get_mut(index) {
                             if cfg.dialogue_foldable {
                                 let cobj = StructToken {
                                     text: text_valid.clone(),
@@ -2119,6 +2123,7 @@ need_process_outline_note: 0,
                                 last_scen_structure_token.children.push(cobj.clone());
                                 self.last_chartor_structure_token = Some(cobj);
                             }
+                        }
                         }
 
                         // 处理角色名格式
@@ -2320,8 +2325,10 @@ need_process_outline_note: 0,
                             };
 
                             if self.current_depth == 0 {
-                                if let Some(last_scen) = &mut self.last_scen_structure_token {
-                                    last_scen.synopses.push(synopsis);
+                                if let Some(index) = self.last_scen_structure_token_index {
+                                    if let Some(last_scen) = self.result.properties.structure.get_mut(index) {
+                                        last_scen.synopses.push(synopsis);
+                                    }
                                 }
                             } else {
                                 if let Some(level) = self.latest_section(self.current_depth) {
