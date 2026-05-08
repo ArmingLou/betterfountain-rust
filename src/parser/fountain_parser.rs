@@ -2470,30 +2470,40 @@ if let Some(index) = self.last_scen_structure_token_index {
         self.update_previous_scene_length(); // 统计最后一个场景的时长
 
         // 处理镜头交切的场景，将场景时间平均分配调整一下
-        for shot_cut_token in &mut self.shot_cut_strct_tokens {
+        for shot_cut_token in &self.shot_cut_strct_tokens {
             let duration = shot_cut_token
                 .get("duration")
                 .and_then(|v| v.as_f64())
                 .unwrap_or(0.0);
 
-            if let Some(structs) = shot_cut_token.get_mut("structs") {
-                if let Some(structs_array) = structs.as_array_mut() {
+            if let Some(structs) = shot_cut_token.get("structs") {
+                if let Some(structs_array) = structs.as_array() {
                     if duration == 0.0 || structs_array.is_empty() {
                         continue;
                     }
 
                     let average_duration = duration / structs_array.len() as f64;
+                    // 收集需要更新的场景 ID
+                    let mut scene_ids: Vec<String> = Vec::new();
                     for struct_token in structs_array {
-                        if let Some(token) = struct_token.as_object_mut() {
-                            let current_duration = token
-                                .get("duration_sec")
-                                .and_then(|v| v.as_f64())
-                                .unwrap_or(0.0);
-
-                            token.insert(
-                                "duration_sec".to_string(),
-                                serde_json::to_value(current_duration + average_duration).unwrap(),
-                            );
+                        if let Some(id) = struct_token.get("id").and_then(|v| v.as_str()) {
+                            scene_ids.push(id.to_string());
+                        }
+                    }
+                    // 更新 structure 中的场景
+                    for scene_id in &scene_ids {
+                        for token in &mut self.result.properties.structure {
+                            if token.id.as_ref() == Some(scene_id) {
+                                token.duration_sec += average_duration;
+                                break;
+                            }
+                            // 同时检查 children
+                            for child in &mut token.children {
+                                if child.id.as_ref() == Some(scene_id) {
+                                    child.duration_sec += average_duration;
+                                    break;
+                                }
+                            }
                         }
                     }
                 }
