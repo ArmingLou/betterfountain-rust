@@ -2486,12 +2486,12 @@ if let Some(index) = self.last_scen_structure_token_index {
                     for struct_token in structs_array {
                         if let Some(token) = struct_token.as_object_mut() {
                             let current_duration = token
-                                .get("durationSec")
+                                .get("duration_sec")
                                 .and_then(|v| v.as_f64())
                                 .unwrap_or(0.0);
 
                             token.insert(
-                                "durationSec".to_string(),
+                                "duration_sec".to_string(),
                                 serde_json::to_value(current_duration + average_duration).unwrap(),
                             );
                         }
