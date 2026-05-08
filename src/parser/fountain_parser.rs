@@ -131,6 +131,7 @@ pub struct FountainParser {
     play_time_sec: f64,
     last_scen_structure_token_index: Option<usize>,
     last_scen_structure_token_index_pre: Option<usize>,
+    last_scen_in_children: bool,
     last_chartor_structure_token: Option<StructToken>,
     force_not_dual: bool,
     take_count: usize,
@@ -161,6 +162,7 @@ impl FountainParser {
             play_time_sec: 0.0,
             last_scen_structure_token_index: None,
             last_scen_structure_token_index_pre: None,
+            last_scen_in_children: false,
             last_chartor_structure_token: None,
             force_not_dual: true,
             take_count: 1,
@@ -324,6 +326,13 @@ if let Some(index) = self.last_scen_structure_token_index {
                     }
                 } else {
                     last_scen_structure_token.duration_sec += time;
+                    if self.last_scen_in_children {
+                        if let Some(last_child) = last_scen_structure_token.children.last_mut() {
+                            if last_child.isscene {
+                                last_child.duration_sec += time;
+                            }
+                        }
+                    }
                 }
             }
 
@@ -396,6 +405,13 @@ if let Some(index) = self.last_scen_structure_token_index {
                     }
                 } else {
                     last_scen_structure_token.duration_sec += time;
+                    if self.last_scen_in_children {
+                        if let Some(last_child) = last_scen_structure_token.children.last_mut() {
+                            if last_child.isscene {
+                                last_child.duration_sec += time;
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1657,6 +1673,11 @@ if let Some(index) = self.last_scen_structure_token_index {
                         }
 
                         self.last_scen_structure_token_index_pre = self.last_scen_structure_token_index;
+                        if self.current_depth > 0 {
+                            self.last_scen_in_children = true;
+                        } else {
+                            self.last_scen_in_children = false;
+                        }
                         self.last_scen_structure_token_index = Some(self.result.properties.structure.len() - 1);
 
                         if self.shot_cut > 0 {
