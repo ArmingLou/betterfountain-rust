@@ -82,16 +82,12 @@ pub struct ParseOutput {
     pub state: String,
     pub dual_str: Option<String>,
     pub title_page: HashMap<String, Vec<ScriptToken>>,
-    /// 对白中每字符耗时预估(不含标点)
     pub dial_sec_per_char: f64,
-    /// 对白中每个短标点耗时预估(逗号顿号等)
     pub dial_sec_per_punc_short: f64,
-    /// 对白中每个长标点耗时预估(句号问号等)
     pub dial_sec_per_punc_long: f64,
-    /// action文本中每字符转化成影片时长预估(不含标点)
     pub action_sec_per_char: f64,
-    /// 处理后的行列表
     pub lines: Vec<Line>,
+    pub statistics: Option<crate::statistics::Statistics>,
 }
 
 impl ParseOutput {
@@ -112,6 +108,7 @@ impl ParseOutput {
             dial_sec_per_punc_long: 0.75,
             action_sec_per_char: 0.4,
             lines: Vec::new(),
+            statistics: None,
         }
     }
 }
@@ -563,6 +560,46 @@ need_process_outline_note: 0,
         current_section
     }
 
+    fn latest_section_or_scene(&self, depth: usize) -> Option<StructToken> {
+        if depth <= 0 {
+            return None;
+        }
+
+        let mut current = None;
+        for item in self.result.properties.structure.iter().rev() {
+            if item.section || item.isscene {
+                current = Some(item.clone());
+                break;
+            }
+        }
+
+        if depth == 1 || current.is_none() {
+            return current;
+        }
+
+        let mut current_depth = 1;
+        while current_depth < depth {
+            let node = current.clone().unwrap();
+            
+            let mut found_child = false;
+            for child in node.children.iter().rev() {
+                if child.section || child.isscene {
+                    current = Some(child.clone());
+                    found_child = true;
+                    break;
+                }
+            }
+
+            if !found_child {
+                break;
+            }
+
+            current_depth += 1;
+        }
+
+        current
+    }
+
     fn add_duration_to_scene(structure: &mut Vec<StructToken>, scene_id: &str, time: f64) -> bool {
         for token in structure.iter_mut() {
             if token.id.as_deref() == Some(scene_id) {
@@ -570,6 +607,19 @@ need_process_outline_note: 0,
                 return true;
             }
             if Self::add_duration_to_scene(&mut token.children, scene_id, time) {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn add_synopsis_to_section(structure: &mut Vec<StructToken>, section_id: &str, synopsis: Synopsis) -> bool {
+        for token in structure.iter_mut() {
+            if token.id.as_deref() == Some(section_id) {
+                token.synopses.push(synopsis);
+                return true;
+            }
+            if Self::add_synopsis_to_section(&mut token.children, section_id, synopsis.clone()) {
                 return true;
             }
         }
@@ -823,7 +873,14 @@ need_process_outline_note: 0,
     /// # Returns
     ///
     /// 解析结果对象
-    pub fn parse(&mut self, script: &str, cfg: &Conf, generate_html: bool) -> ParseOutput {
+    /// 
+    /// # Arguments
+    ///
+    /// * `script` - Fountain 格式的剧本文本
+    /// * `cfg` - 配置对象
+    /// * `generate_html` - 是否生成 HTML 输出
+    /// * `calc_statistics` - 是否计算统计数据（可选，默认 false）
+    pub fn parse(&mut self, script: &str, cfg: &Conf, generate_html: bool, calc_statistics: Option<bool>) -> ParseOutput {
         // 初始化解析结果
         self.result = ParseOutput::new();
         if script.is_empty() {
@@ -1645,7 +1702,7 @@ need_process_outline_note: 0,
                             cobj.id = Some(format!("/{}", this_token.line));
                             self.result.properties.structure.push(cobj.clone());
                         } else {
-                            if let Some(level) = self.latest_section(self.current_depth) {
+                            if let Some(level) = self.latest_section_or_scene(self.current_depth) {
                                 cobj.id = Some(format!(
                                     "{}/{}",
                                     level.id.as_ref().unwrap_or(&String::new()),
@@ -2359,12 +2416,9 @@ need_process_outline_note: 0,
                                     }
                                 }
                             } else {
-                                if let Some(level) = self.latest_section(self.current_depth) {
-                                    for parent in &mut self.result.properties.structure {
-                                        if parent.id == level.id {
-                                            parent.synopses.push(synopsis);
-                                            break;
-                                        }
+                                if let Some(level) = self.latest_section_or_scene(self.current_depth) {
+                                    if let Some(section_id) = &level.id {
+                                        Self::add_synopsis_to_section(&mut self.result.properties.structure, section_id, synopsis);
                                     }
                                 }
                             }
@@ -2607,6 +2661,20 @@ need_process_outline_note: 0,
             .as_millis() as u64;
 
         self.result.parse_time = end_time - self.result.parse_time;
+
+        // 根据参数决定是否计算统计数据（默认不计算，提高性能）
+        let should_calc_stats = calc_statistics.unwrap_or(false);
+        if should_calc_stats {
+            self.result.statistics = Some(crate::statistics::calculate_statistics(
+                &self.result.tokens,
+                &self.result.properties,
+                self.result.length_dialogue,
+                self.result.length_action,
+                self.result.dial_sec_per_char,
+                self.result.dial_sec_per_punc_short,
+                self.result.dial_sec_per_punc_long,
+            ));
+        }
 
         self.result.clone()
     }

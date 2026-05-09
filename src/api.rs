@@ -100,7 +100,7 @@ pub struct ExportResult {
 pub async fn parse_fountain_text(text: String, config: Option<SimpleConf>) -> String {
     let conf = config.unwrap_or_default().into();
     let mut parser = FountainParser::new();
-    let result = parser.parse(&text, &conf, false);
+    let result = parser.parse(&text, &conf, false, None);
 
     // 返回简单的JSON格式结果
     serde_json::to_string(&result).unwrap_or_else(|_| "{}".to_string())
@@ -116,7 +116,7 @@ pub async fn export_to_docx(
 
     // 解析文本
     let mut parser = FountainParser::new();
-    let parsed = parser.parse(&text, &conf, false);
+    let parsed = parser.parse(&text, &conf, false, None);
 
     // 直接使用异步函数
     match generate_docx_document(&output_path, &conf, &parsed).await {
@@ -142,7 +142,7 @@ pub async fn export_to_docx_base64(
 
     // 解析文本
     let mut parser = FountainParser::new();
-    let parsed = parser.parse(&text, &conf, false);
+    let parsed = parser.parse(&text, &conf, false, None);
 
     // 直接使用异步函数
     match generate_docx_document("$PREVIEW$", &conf, &parsed).await {

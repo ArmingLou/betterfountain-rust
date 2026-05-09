@@ -17,7 +17,7 @@ fn main() {
         Ok(content) => {
             let config = Conf::default();
             let mut parser = FountainParser::new();
-            let result = parser.parse(&content, &config, true);
+            let result = parser.parse(&content, &config, true, Some(true));
 
             println!("解析完成！");
             println!("解析时间: {}ms", result.parse_time);

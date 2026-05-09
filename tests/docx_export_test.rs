@@ -26,7 +26,7 @@ async fn test_docx_export() {
 
     eprintln!("配置创建成功");
 
-    let result = parser.parse(&script, &conf, true);
+    let result = parser.parse(&script, &conf, true, Some(true));
     eprintln!("解析剧本成功");
 
     eprintln!("标题页元素数量: {}", result.title_page.len());

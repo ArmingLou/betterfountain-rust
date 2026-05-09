@@ -28,7 +28,7 @@ fn test_chinese_script_parsing() {
     conf.dial_sec_per_punc_long = 0.75;
     conf.action_sec_per_char = 0.4;
 
-    let result = parser.parse(&script, &conf, true);
+    let result = parser.parse(&script, &conf, true, Some(true));
 
     // 打印详细结果
     println!("=== 解析结果 ===");
@@ -187,7 +187,7 @@ JOHN
 你好，世界！这是一句对话。
 "#;
 
-    let result = parser.parse(script, &custom_conf, false);
+    let result = parser.parse(script, &custom_conf, false, Some(true));
 
     // 验证配置参数被正确传递
     assert_eq!(result.dial_sec_per_char, 0.5, "对话每字符时长应该为自定义值0.5");
