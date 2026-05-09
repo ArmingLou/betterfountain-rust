@@ -73,28 +73,28 @@ impl ParagraphSpacing {
         let mut spacing = docx_rs::LineSpacing::new();
 
         if let Some(before) = self.before {
-            println!("【适配器日志】设置段前间距: {} twips", before);
+            // println!("【适配器日志】设置段前间距: {} twips", before);
             spacing = spacing.before(before as u32);
         }
 
         if let Some(after) = self.after {
-            println!("【适配器日志】设置段后间距: {} twips", after);
+            // println!("【适配器日志】设置段后间距: {} twips", after);
             spacing = spacing.after(after as u32);
         }
 
         if let Some(before_lines) = self.before_lines {
-            println!("【适配器日志】设置段前行数: {}", before_lines);
+            // println!("【适配器日志】设置段前行数: {}", before_lines);
             spacing = spacing.before_lines(before_lines as u32);
         }
 
         if let Some(after_lines) = self.after_lines {
-            println!("【适配器日志】设置段后行数: {}", after_lines);
+            // println!("【适配器日志】设置段后行数: {}", after_lines);
             spacing = spacing.after_lines(after_lines as u32);
         }
 
         if let Some(line) = self.line {
             println!(
-                "【适配器日志】设置行距: {} twips ({:.1}倍单倍行距)",
+                // "【适配器日志】设置行距: {} twips ({:.1}倍单倍行距)",
                 line,
                 line as f32 / 240.0
             );
@@ -103,7 +103,7 @@ impl ParagraphSpacing {
 
         if let Some(line_rule) = self.line_rule {
             let rule_type = line_rule.to_docx_line_spacing_type();
-            println!("【适配器日志】设置行距类型: {:?}", rule_type);
+            // println!("【适配器日志】设置行距类型: {:?}", rule_type);
             spacing = spacing.line_rule(rule_type);
         }
 
