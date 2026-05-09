@@ -4,6 +4,41 @@ use std::fs;
 use std::path::Path;
 
 #[test]
+fn test_aqiang_aizhen_dialogue() {
+    let mut parser = FountainParser::new();
+    let script_path = "/Users/arming/Documents/write/无限失恋，珍强！/无限失恋，珍强！-[03].fountain";
+    let script = fs::read_to_string(script_path).expect("无法读取");
+
+    let mut conf = Conf::default();
+    conf.print_notes = true;
+    conf.dial_sec_per_char = 0.1;
+    conf.dial_sec_per_punc_short = 0.2;
+    conf.dial_sec_per_punc_long = 0.6;
+    conf.action_sec_per_char = 0.7;
+
+    let result = parser.parse(&script, &conf, false, Some(true));
+
+    println!("\n全部对白 (字符归属):");
+    for token in &result.tokens {
+        if token.token_type == "dialogue" {
+            let char_name = token.character.as_deref().unwrap_or("?");
+            let text: String = token.text_no_notes.as_deref().unwrap_or(&token.text).chars().take(50).collect();
+            println!("  行{} [{}] {}", token.line, char_name, text);
+        }
+    }
+
+    println!("\n阿强统计:");
+    if let Some(ref stats) = result.statistics {
+        for c in &stats.character_stats.characters {
+            if c.name.contains("阿强") || c.name.contains("阿珍") {
+                println!("  {}: 对白={:.1}s, 总={:.1}s, 场景={}", 
+                    c.name, c.seconds_spoken, c.seconds_total, c.number_of_scenes);
+            }
+        }
+    }
+}
+
+#[test]
 fn test_statistics_debug() {
     // 创建解析器
     let mut parser = FountainParser::new();
@@ -115,18 +150,19 @@ fn test_statistics_debug() {
         }
         
         // 检查 action 中的 characters_action
-        println!("\n  包含角色名的Action:");
+        println!("\n  包含角色名的Action总数: ");
+        let mut action_char_count = 0;
         for token in &result.tokens {
             if token.token_type == "action" {
                 if let Some(chars) = &token.characters_action {
                     if !chars.is_empty() {
-                        let text_preview: String = token.text.chars().take(30).collect();
-                        println!("    行{}: '{}' -> 角色: {:?}, time: {:?}", 
-                            token.line, text_preview, chars, token.time);
+                        action_char_count += 1;
                     }
                 }
             }
         }
+        println!("    {} 个 action 包含角色名", action_char_count);
+        println!("    总共 {} 个 action token", result.tokens.iter().filter(|t| t.token_type == "action").count());
         
         // 再检查顾清的总时长是否包含action时间
         if let Some(ref stats) = result.statistics {

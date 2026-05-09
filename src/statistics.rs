@@ -342,6 +342,30 @@ fn calculate_character_statistics(
         });
     }
 
+    // 补充只有场景出现但无对白的角色（如人设中定义的角色）
+    for char_name in properties.characters.keys() {
+        if !dialogue_per_character.contains_key(char_name) {
+            let seconds_action = action_time_per_character.get(char_name).copied().unwrap_or(0.0);
+            let number_of_scenes = properties
+                .character_scene_number
+                .as_ref()
+                .and_then(|map| map.get(char_name))
+                .map(|set| set.len())
+                .unwrap_or(0);
+            character_stats.push(CharacterStat {
+                name: char_name.clone(),
+                color: word_to_hex_color(char_name),
+                speaking_parts: 0,
+                seconds_spoken: 0.0,
+                seconds_total: seconds_action,
+                average_complexity: 0.0,
+                monologues: 0,
+                words_spoken: 0,
+                number_of_scenes,
+            });
+        }
+    }
+
     character_stats.sort_by(|a, b| {
         if b.speaking_parts != a.speaking_parts {
             b.speaking_parts.cmp(&a.speaking_parts)
@@ -450,6 +474,75 @@ fn calculate_scene_statistics(
     }
 }
 
+/// 插入角色时间线数据点，跨度大时插入凹凸点（参考 VSCode 实现）
+fn insert_character_timeline_point(
+    timeline: &mut Vec<CharacterDialogueItem>,
+    element: &crate::models::ScriptToken,
+    current_scene: &str,
+    time: f64,
+    gap: f64,
+    is_monologue: bool,
+    word_count: f64,
+) {
+    let prev_global = timeline.last().map(|x| x.length_time_global).unwrap_or(0.0);
+    let prev_words = timeline.last().map(|x| x.length_words_global).unwrap_or(0.0);
+    let insert_pre = if let Some(last) = timeline.last() {
+        last.play_time_sec + gap < element.play_time_sec - time
+    } else {
+        true // 第一个元素也要插入前置零点
+    };
+
+    if insert_pre {
+        // 前一个点之后立即归零
+        if let Some(last) = timeline.last() {
+            timeline.push(CharacterDialogueItem {
+                line: last.line + 1,
+                play_time_sec: last.play_time_sec + 1.0,
+                scene: current_scene.to_string(),
+                length_time_global: 0.0,
+                length_words_global: 0.0,
+                monologue: false,
+                length_time: 0.0,
+                length_words: 0.0,
+            });
+        }
+        // 当前点前两个时间单位，归零
+        timeline.push(CharacterDialogueItem {
+            line: element.line.saturating_sub(2),
+            play_time_sec: element.play_time_sec - time - 1.0,
+            scene: current_scene.to_string(),
+            length_time_global: 0.0,
+            length_words_global: 0.0,
+            monologue: false,
+            length_time: 0.0,
+            length_words: 0.0,
+        });
+        // 当前点前一个时间单位，恢复到之前累计值（起桥）
+        timeline.push(CharacterDialogueItem {
+            line: element.line.saturating_sub(1),
+            play_time_sec: element.play_time_sec - time,
+            scene: current_scene.to_string(),
+            length_time_global: prev_global,
+            length_words_global: prev_words,
+            monologue: false,
+            length_time: 0.0,
+            length_words: 0.0,
+        });
+    }
+
+    // 当前数据点
+    timeline.push(CharacterDialogueItem {
+        line: element.line,
+        play_time_sec: element.play_time_sec,
+        scene: current_scene.to_string(),
+        length_time_global: prev_global + time,
+        length_words_global: prev_words + word_count,
+        monologue: is_monologue,
+        length_time: time,
+        length_words: word_count,
+    });
+}
+
 /// 计算时长统计
 fn calculate_duration_statistics(
     tokens: &[crate::models::ScriptToken],
@@ -479,7 +572,12 @@ fn calculate_duration_statistics(
     
     // 角色时间线数据
     let mut characters_timeline: HashMap<String, Vec<CharacterDialogueItem>> = HashMap::new();
-    let gap = 60.0;
+    
+    let gap = if length_action + length_dialogue > 380.0 {
+        (length_action + length_dialogue) / 10.0
+    } else {
+        40.0
+    };
 
     for element in tokens.iter() {
         if element.token_type == "action" || element.token_type == "dialogue" {
@@ -499,35 +597,7 @@ fn calculate_duration_statistics(
                     if !characters_action.is_empty() && time > 0.0 {
                         for char_name in characters_action {
                             let char_timeline = characters_timeline.entry(char_name.clone()).or_insert_with(Vec::new);
-                            let prev_dialogue_len = char_timeline.last().map(|x| x.length_time_global).unwrap_or(0.0);
-                            let prev_words_len = char_timeline.last().map(|x| x.length_words_global).unwrap_or(0.0);
-                            
-                            // 检查是否需要插入不活跃点
-                            if let Some(last_item) = char_timeline.last() {
-                                if last_item.play_time_sec + gap < element.play_time_sec - time {
-                                    char_timeline.push(CharacterDialogueItem {
-                                        line: element.line,
-                                        play_time_sec: last_item.play_time_sec + 1.0,
-                                        scene: current_scene.clone(),
-                                        length_time_global: 0.0,
-                                        length_words_global: 0.0,
-                                        monologue: false,
-                                        length_time: 0.0,
-                                        length_words: 0.0,
-                                    });
-                                }
-                            }
-                            
-                            char_timeline.push(CharacterDialogueItem {
-                                line: element.line,
-                                play_time_sec: element.play_time_sec,
-                                scene: current_scene.clone(),
-                                length_time_global: prev_dialogue_len + time,
-                                length_words_global: prev_words_len,
-                                monologue: false,
-                                length_time: time,
-                                length_words: 0.0,
-                            });
+                            insert_character_timeline_point(char_timeline, element, &current_scene, time, gap, false, 0.0);
                         }
                     }
                 }
@@ -547,37 +617,9 @@ fn calculate_duration_statistics(
                 // 角色对话时间线
                 if let Some(char_name) = &element.character {
                     let char_timeline = characters_timeline.entry(char_name.clone()).or_insert_with(Vec::new);
-                    let prev_dialogue_len = char_timeline.last().map(|x| x.length_time_global).unwrap_or(0.0);
-                    let prev_words_len = char_timeline.last().map(|x| x.length_words_global).unwrap_or(0.0);
                     let word_count = element.text.split_whitespace().count() as f64;
                     let is_monologue = time > 30.0;
-                    
-                    // 检查是否需要插入不活跃点
-                    if let Some(last_item) = char_timeline.last() {
-                        if last_item.play_time_sec + gap < element.play_time_sec - time {
-                            char_timeline.push(CharacterDialogueItem {
-                                line: element.line,
-                                play_time_sec: last_item.play_time_sec + 1.0,
-                                scene: current_scene.clone(),
-                                length_time_global: 0.0,
-                                length_words_global: 0.0,
-                                monologue: false,
-                                length_time: 0.0,
-                                length_words: 0.0,
-                            });
-                        }
-                    }
-                    
-                    char_timeline.push(CharacterDialogueItem {
-                        line: element.line,
-                        play_time_sec: element.play_time_sec,
-                        scene: current_scene.clone(),
-                        length_time_global: prev_dialogue_len + time,
-                        length_words_global: prev_words_len + word_count,
-                        monologue: is_monologue,
-                        length_time: time,
-                        length_words: word_count,
-                    });
+                    insert_character_timeline_point(char_timeline, element, &current_scene, time, gap, is_monologue, word_count);
                 }
             }
         }
@@ -637,7 +679,8 @@ fn calculate_duration_statistics(
     // 转换为角色时间线数据
     let mut characternames: Vec<String> = Vec::new();
     let mut characters: Vec<Vec<CharacterDialogueItem>> = Vec::new();
-    for (name, timeline) in characters_timeline.into_iter() {
+    for (name, mut timeline) in characters_timeline.into_iter() {
+        timeline.sort_by(|a, b| a.play_time_sec.partial_cmp(&b.play_time_sec).unwrap_or(std::cmp::Ordering::Equal));
         characternames.push(name);
         characters.push(timeline);
     }

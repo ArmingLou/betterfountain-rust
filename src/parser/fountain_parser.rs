@@ -131,6 +131,7 @@ pub struct FountainParser {
     last_scen_in_children: bool,
     last_scen_id: Option<String>,
     last_scen_id_pre: Option<String>,
+            previous_character: Option<String>,
     last_chartor_structure_token: Option<StructToken>,
     force_not_dual: bool,
     take_count: usize,
@@ -164,6 +165,7 @@ impl FountainParser {
             last_scen_in_children: false,
             last_scen_id: None,
             last_scen_id_pre: None,
+            previous_character: None,
             last_chartor_structure_token: None,
             force_not_dual: true,
             take_count: 1,
@@ -275,6 +277,8 @@ need_process_outline_note: 0,
 
     // 处理对话块
     fn process_dialogue_block(&mut self, mut token: ScriptToken) -> ScriptToken {
+        // 传播角色名到对白token
+        token.character = self.previous_character.clone();
         // 第一个场景之前的时间不累计（与Flutter版本保持一致）
         if !self.result.properties.scenes.is_empty() {
             token.text_no_notes = Some(self.text_valid.clone());
@@ -920,6 +924,7 @@ need_process_outline_note: 0,
         self.last_scen_structure_token_index_pre = None;
         let mut last_character_index = 0;
         let mut _previous_character: Option<String> = None;
+        self.previous_character = None;
 
         let mut parenthetical_open = false;
         self.result.dual_str = None;
@@ -2096,22 +2101,33 @@ need_process_outline_note: 0,
                             .trim_character_extension(&text_valid)
                             .trim()
                             .to_string();
-                        _previous_character = Some(character.clone());
+                        self.previous_character = Some(character.clone());
                         this_token.character = Some(character.clone());
 
-                        // 更新角色信息
-                        let scene_idx = self.result.properties.scenes.len().saturating_sub(1);
+                        // 更新角色信息：仅在已有场景时才记录
+                        let scene_idx = self.result.properties.scenes.len();
 
-                        if let Some(values) = self.result.properties.characters.get_mut(&character)
-                        {
-                            if !values.contains(&scene_idx) {
-                                values.push(scene_idx);
+                        if scene_idx > 0 {
+                            let actual_idx = scene_idx - 1;
+                            if let Some(values) = self.result.properties.characters.get_mut(&character)
+                            {
+                                if !values.contains(&actual_idx) {
+                                    values.push(actual_idx);
+                                }
+                            } else {
+                                self.result
+                                    .properties
+                                    .characters
+                                    .insert(character.clone(), vec![actual_idx]);
                             }
                         } else {
-                            self.result
-                                .properties
-                                .characters
-                                .insert(character.clone(), vec![scene_idx]);
+                            // 第一个场景之前：初始化角色但不记录场景
+                            if !self.result.properties.characters.contains_key(&character) {
+                                self.result
+                                    .properties
+                                    .characters
+                                    .insert(character.clone(), Vec::new());
+                            }
                         }
 
                         if self.result.properties.character_lines.is_none() {
