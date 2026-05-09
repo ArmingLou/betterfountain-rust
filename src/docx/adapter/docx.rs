@@ -93,11 +93,11 @@ impl ParagraphSpacing {
         }
 
         if let Some(line) = self.line {
-            println!(
-                // "【适配器日志】设置行距: {} twips ({:.1}倍单倍行距)",
-                line,
-                line as f32 / 240.0
-            );
+            // println!(
+            //     "【适配器日志】设置行距: {} twips ({:.1}倍单倍行距)",
+            //     line,
+            //     line as f32 / 240.0
+            // );
             spacing = spacing.line(line);
         }
 
