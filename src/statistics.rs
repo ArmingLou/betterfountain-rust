@@ -573,14 +573,16 @@ fn calculate_duration_statistics(
     // 角色时间线数据
     let mut characters_timeline: HashMap<String, Vec<CharacterDialogueItem>> = HashMap::new();
     
-    let gap = if length_action + length_dialogue > 380.0 {
-        (length_action + length_dialogue) / 10.0
+    let gap = if length_action + length_dialogue > 960.0 {
+        (length_action + length_dialogue) / 24.0
     } else {
         40.0
     };
 
     for element in tokens.iter() {
-        if element.token_type == "action" || element.token_type == "dialogue" {
+        if element.token_type == "scene_heading" {
+            current_scene = element.text.clone();
+        } else if element.token_type == "action" || element.token_type == "dialogue" {
             let time = element.time.unwrap_or(0.0);
 
             if element.token_type == "action" {
