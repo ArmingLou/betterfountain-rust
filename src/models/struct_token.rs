@@ -27,6 +27,7 @@ pub struct Range {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StructToken {
     pub text: String,
+    pub is_bookmark: bool,
     pub isnote: bool,
     pub id: Option<String>,
     pub children: Vec<StructToken>,
@@ -54,6 +55,7 @@ impl StructToken {
     ) -> Self {
         StructToken {
             text,
+            is_bookmark: false,
             isnote: false,
             id: None,
             children: Vec::new(),

@@ -147,6 +147,11 @@ pub struct FountainParser {
     nested_comments: i32,
     nested_notes: i32,
     need_process_outline_note: i32,
+    // Bookmark fields
+    bookmark_text: Vec<String>,
+    bookmark_linenum: Vec<usize>,
+    bookmark_started: bool,
+    text_bookmark: String,
     regex: HashMap<String, Regex>,
     title_page_display: HashMap<String, TitleKeywordFormat>,
 }
@@ -181,6 +186,10 @@ impl FountainParser {
             nested_comments: 0,
             nested_notes: 0,
 need_process_outline_note: 0,
+            bookmark_text: Vec::new(),
+            bookmark_linenum: Vec::new(),
+            bookmark_started: false,
+            text_bookmark: String::new(),
             regex: HashMap::new(),
             title_page_display: HashMap::new(),
         };
@@ -685,6 +694,7 @@ need_process_outline_note: 0,
 
                     let struct_token = StructToken {
                         text: note_text.clone(),
+                        is_bookmark: false,
                         isnote: true,
                         id: Some(format!("/{}", line_number)),
                         isscene: false,
@@ -717,6 +727,48 @@ need_process_outline_note: 0,
         }
     }
 
+    fn process_bookmarks(&mut self) {
+        if !self.bookmark_text.is_empty() {
+            for i in 0..self.bookmark_text.len() {
+                if !self.bookmark_text[i].trim().is_empty() {
+                    let line_number = self.bookmark_linenum[i];
+                    let bookmark_text = self.bookmark_text[i].trim().to_string();
+
+                    let struct_token = StructToken {
+                        text: bookmark_text,
+                        is_bookmark: true,
+                        isnote: false,
+                        id: Some(format!("/{}", line_number)),
+                        isscene: false,
+                        ischartor: false,
+                        dialogue_end_line: 0,
+                        duration_sec: 0.0,
+                        children: Vec::new(),
+                        level: 0,
+                        notes: Vec::new(),
+                        range: Some(Range {
+                            start: Position {
+                                line: line_number,
+                                character: 0,
+                            },
+                            end: Position {
+                                line: line_number,
+                                character: 4,
+                            },
+                        }),
+                        section: false,
+                        synopses: Vec::new(),
+                        play_sec: self.play_time_sec,
+                        structs: Vec::new(),
+                        duration: 0.0,
+                    };
+
+                    self.result.properties.structure.push(struct_token);
+                }
+            }
+        }
+    }
+
     // 添加对话编号装饰
     fn add_dialogue_number_decoration(&self, _token: &mut ScriptToken) {
         // 在Rust实现中可以根据需要添加具体实现
@@ -726,11 +778,14 @@ need_process_outline_note: 0,
     fn process_comments_and_notes(&mut self, parts: Vec<&str>, line_num: usize, cfg: &Conf) {
         for part in parts {
             if !part.is_empty() {
-                if part == "/*" {
+                if part == "/*" || part == "/*|" {
                     if self.nested_notes == 0 {
+                        if self.nested_comments == 0 && part == "/*|" {
+                            self.bookmark_started = true;
+                            self.bookmark_linenum.push(line_num);
+                        }
                         self.nested_comments += 1;
                     } else {
-                        // 是 note 的注解内容
                         self.add_outline_note("/*", line_num);
                         if cfg.print_notes {
                             self.text_display.push_str(part);
@@ -739,13 +794,22 @@ need_process_outline_note: 0,
                 } else if part == "*/" {
                     if self.nested_comments > 0 {
                         self.nested_comments -= 1;
+                        if self.nested_comments == 0 {
+                            if self.bookmark_started {
+                                self.bookmark_text.push(self.text_bookmark.clone());
+                                self.text_bookmark = String::new();
+                                self.bookmark_started = false;
+                            }
+                        } else {
+                            if self.bookmark_started {
+                                self.text_bookmark.push_str(part);
+                            }
+                        }
                     } else {
                         if self.nested_notes == 0 {
-                            // 既不是 note 也不是 comment
                             self.text_display.push_str(part);
                             self.text_valid.push_str(part);
                         } else {
-                            // 是 note 的注解内容
                             self.add_outline_note("*/", line_num);
                             if cfg.print_notes {
                                 self.text_display.push_str(part);
@@ -756,13 +820,11 @@ need_process_outline_note: 0,
                     if self.nested_comments == 0 {
                         self.nested_notes += 1;
                         if self.nested_notes == 1 {
-                            // 需要处理大纲注解
                             self.need_process_outline_note += 1;
                             self.current_outline_note_text.push(String::new());
                             self.current_outline_note_linenum.push(line_num);
                             if cfg.print_notes {
                                 if part == "[[|" {
-                                    // 扩展 note 语法。可强制个别注解不在底部而在原位置打印。
                                     self.text_display.push_str(&format!(
                                         "{}[",
                                         FountainConstants::style_chars()["note_begin_ext"]
@@ -777,11 +839,13 @@ need_process_outline_note: 0,
                         } else {
                             self.add_outline_note("[", line_num);
                             if cfg.print_notes {
-                                self.text_display.push_str("["); // 嵌套的里层开口
+                                self.text_display.push_str("[");
                             }
                         }
                     } else {
-                        // 是 comment 的注解内容
+                        if self.bookmark_started {
+                            self.text_bookmark.push_str(part);
+                        }
                     }
                 } else if part == "]]" {
                     if self.nested_notes > 0 {
@@ -791,27 +855,29 @@ need_process_outline_note: 0,
                                 self.text_display.push_str(&format!(
                                     "]{}",
                                     FountainConstants::style_chars()["note_end"]
-                                )); // 闭口，转换成特殊样式字符。
+                                ));
                             }
                         } else {
                             self.add_outline_note("]", line_num);
                             if cfg.print_notes {
-                                self.text_display.push_str("]"); // 嵌套的里层闭口
+                                self.text_display.push_str("]");
                             }
                         }
                     } else {
                         if self.nested_comments == 0 {
-                            // 既不是 comment 也不是 note
                             self.text_display.push_str(part);
                             self.text_valid.push_str(part);
                         } else {
-                            // 是 comment 的注解内容
+                            if self.bookmark_started {
+                                self.text_bookmark.push_str(part);
+                            }
                         }
                     }
                 } else {
-                    // 非符号文字内容
                     if self.nested_comments > 0 {
-                        // 注释内容，忽略
+                        if self.bookmark_started {
+                            self.text_bookmark.push_str(part);
+                        }
                     } else if self.nested_notes > 0 {
                         self.add_outline_note(if !part.is_empty() { part } else { "" }, line_num);
                         if cfg.print_notes {
@@ -991,7 +1057,7 @@ need_process_outline_note: 0,
                 // 至少不是空行了
 
                 // 分割注释和注解
-                let re = Regex::new(r"(\/\*|\*\/|\[\[\||\[\[|\]\])").unwrap();
+                let re = Regex::new(r"(\/\*\||\/\*|\*\/|\[\[\||\[\[|\]\])").unwrap();
                 let mut parts = Vec::new();
                 let mut last_end = 0;
 
@@ -1697,6 +1763,7 @@ need_process_outline_note: 0,
                             }),
                             id: None,
                             isnote: false,
+                            is_bookmark: false,
                             play_sec: self.play_time_sec,
                             structs: Vec::new(),
                             duration: 0.0,
@@ -2209,6 +2276,7 @@ need_process_outline_note: 0,
                                         this_token.line
                                     )),
                                     isnote: false,
+                                    is_bookmark: false,
                                     play_sec: 0.0,
                                     structs: Vec::new(),
                                     duration: 0.0,
@@ -2344,6 +2412,7 @@ need_process_outline_note: 0,
                                 }),
                                 id: None,
                                 isnote: false,
+                                is_bookmark: false,
                                 play_sec: self.play_time_sec,
                                 structs: Vec::new(),
                                 duration: 0.0,
@@ -2527,6 +2596,8 @@ need_process_outline_note: 0,
             self.process_inline_notes();
             self.need_process_outline_note = 0;
         }
+
+        self.process_bookmarks();
 
         self.update_previous_scene_length(); // 统计最后一个场景的时长
 
