@@ -832,9 +832,9 @@ impl DocxContext {
         print: &PrintProfile,
         spacing: &ParagraphSpacing,
     ) {
-        println!("【finish_double_dial】开始处理双对话，左侧缓存: {}, 右侧缓存: {}, 全局左侧: {}, 全局右侧: {}",
-            self.last_dial_gr_left.is_some(), self.last_dial_gr_right.is_some(),
-            self.last_dial_table_left.len(), self.last_dial_table_right.len());
+        // println!("【finish_double_dial】开始处理双对话，左侧缓存: {}, 右侧缓存: {}, 全局左侧: {}, 全局右侧: {}",
+        //     self.last_dial_gr_left.is_some(), self.last_dial_gr_right.is_some(),
+        //     self.last_dial_table_left.len(), self.last_dial_table_right.len());
 
         // 处理左侧对话缓存，添加到全局表格缓存
         if let Some(dial_gr_left) = self.last_dial_gr_left.take() {
@@ -878,11 +878,11 @@ impl DocxContext {
 
         // 如果有双对话内容，创建表格 - 使用局部变量，恢复原项目逻辑
         if !self.last_dial_table_left.is_empty() || !self.last_dial_table_right.is_empty() {
-            println!(
-                "【finish_double_dial】创建双对话表格，左侧段落: {}, 右侧段落: {}",
-                self.last_dial_table_left.len(),
-                self.last_dial_table_right.len()
-            );
+            // println!(
+            //     "【finish_double_dial】创建双对话表格，左侧段落: {}, 右侧段落: {}",
+            //     self.last_dial_table_left.len(),
+            //     self.last_dial_table_right.len()
+            // );
             // 计算双对话表格的列宽（参考原项目逻辑）
             let inner_width_twip =
                 convert_inches_to_twip(print.page_width - print.left_margin - print.right_margin);
@@ -2942,10 +2942,10 @@ pub fn generate(
                 || token_type == "character"
                 || token_type == "parenthetical"
             {
-                println!(
-                    "【generate】处理对话类型: {}, dual: {:?}, text: {}",
-                    token_type, line.dual, line.text
-                );
+                // println!(
+                //     "【generate】处理对话类型: {}, dual: {:?}, text: {}",
+                //     token_type, line.dual, line.text
+                // );
 
                 // 检查是否需要处理双对话结束
                 if line.token_type == "character" {
@@ -3022,11 +3022,11 @@ pub fn generate(
                 // 根据 china_format、dual 属性和类型处理
                 if china_format > 0 {
                     // 中文格式：使用缓存拼接机制
-                    println!("【generate】中文格式处理，china_format = {}", china_format);
+                    // println!("【generate】中文格式处理，china_format = {}", china_format);
                     if line.token_type == "character" {
                         // 根据 dual 属性决定缓存位置
                         if line.dual.as_deref() == Some("left") {
-                            println!("【generate】缓存左侧双对话角色: {}", text);
+                            // println!("【generate】缓存左侧双对话角色: {}", text);
                             // 左侧对话
                             doc.last_dial_gr_left = Some(CachedDialogueGroup {
                                 style: "dial".to_string(),
@@ -3035,7 +3035,7 @@ pub fn generate(
                                 indent_right: Some(dial_indent_in),
                             });
                         } else if line.dual.as_deref() == Some("right") {
-                            println!("【generate】缓存右侧双对话角色: {}", text);
+                            // println!("【generate】缓存右侧双对话角色: {}", text);
                             // 右侧对话
                             doc.last_dial_gr_right = Some(CachedDialogueGroup {
                                 style: "dial".to_string(),
@@ -3073,9 +3073,9 @@ pub fn generate(
                                 }
 
                                 // 添加到全局表格缓存 - 修复关键问题
-                                println!(
-                                    "【generate】中文格式左侧括号内容（无缓存）添加到全局表格缓存"
-                                );
+                                // println!(
+                                //     "【generate】中文格式左侧括号内容（无缓存）添加到全局表格缓存"
+                                // );
                                 doc.last_dial_table_left.push(paragraph);
                             }
                         } else if line.dual.as_deref() == Some("right") {
@@ -3097,9 +3097,9 @@ pub fn generate(
                                 }
 
                                 // 添加到全局表格缓存 - 修复关键问题
-                                println!(
-                                    "【generate】中文格式右侧括号内容（无缓存）添加到全局表格缓存"
-                                );
+                                // println!(
+                                //     "【generate】中文格式右侧括号内容（无缓存）添加到全局表格缓存"
+                                // );
                                 doc.last_dial_table_right.push(paragraph);
                             }
                         } else {
@@ -3162,7 +3162,7 @@ pub fn generate(
                                     }
 
                                     // 添加到全局表格缓存
-                                    println!("【generate】中文格式左侧对话添加到全局表格缓存");
+                                    // println!("【generate】中文格式左侧对话添加到全局表格缓存");
                                     doc.last_dial_table_left.push(paragraph);
 
                                     // 清空缓存，准备下一个对话行 - 关键修复
@@ -3184,9 +3184,9 @@ pub fn generate(
                                 }
 
                                 // 添加到全局表格缓存 - 修复关键问题
-                                println!(
-                                    "【generate】中文格式左侧对话（无缓存）添加到全局表格缓存"
-                                );
+                                // println!(
+                                //     "【generate】中文格式左侧对话（无缓存）添加到全局表格缓存"
+                                // );
                                 doc.last_dial_table_left.push(paragraph);
                             }
                         } else if line.dual.as_deref() == Some("right") {
@@ -3216,7 +3216,7 @@ pub fn generate(
                                     }
 
                                     // 添加到全局表格缓存
-                                    println!("【generate】中文格式右侧对话添加到全局表格缓存");
+                                    // println!("【generate】中文格式右侧对话添加到全局表格缓存");
                                     doc.last_dial_table_right.push(paragraph);
 
                                     // 清空缓存，准备下一个对话行 - 关键修复
@@ -3238,9 +3238,9 @@ pub fn generate(
                                 }
 
                                 // 添加到全局表格缓存 - 修复关键问题
-                                println!(
-                                    "【generate】中文格式右侧对话（无缓存）添加到全局表格缓存"
-                                );
+                                // println!(
+                                //     "【generate】中文格式右侧对话（无缓存）添加到全局表格缓存"
+                                // );
                                 doc.last_dial_table_right.push(paragraph);
                             }
                         } else {
@@ -3311,7 +3311,7 @@ pub fn generate(
                     if line.dual.as_deref() == Some("left") || line.dual.as_deref() == Some("right")
                     {
                         // 双对话：添加到全局表格缓存
-                        println!("【generate】国际格式双对话: {} - {}", line.token_type, text);
+                        // println!("【generate】国际格式双对话: {} - {}", line.token_type, text);
 
                         let mut paragraph = crate::docx::adapter::docx::Paragraph::new_with_spacing(
                             spacing.clone(),
@@ -3352,10 +3352,10 @@ pub fn generate(
 
                         // 添加到全局表格缓存 - 修复关键问题
                         if line.dual.as_deref() == Some("left") {
-                            println!("【generate】添加到左侧全局表格缓存");
+                            // println!("【generate】添加到左侧全局表格缓存");
                             doc.last_dial_table_left.push(paragraph);
                         } else {
-                            println!("【generate】添加到右侧全局表格缓存");
+                            // println!("【generate】添加到右侧全局表格缓存");
                             doc.last_dial_table_right.push(paragraph);
                         }
                     } else {

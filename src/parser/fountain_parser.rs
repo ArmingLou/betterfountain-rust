@@ -2383,10 +2383,10 @@ need_process_outline_note: 0,
                             this_token.text = format!("{}{}", group1, group3);
                             process_token_text_style_char(&mut this_token);
 
-                            println!(
-                                "【parse】section: {}, level: {:?}",
-                                this_token.text, this_token.level
-                            );
+                            // println!(
+                            //     "【parse】section: {}, level: {:?}",
+                            //     this_token.text, this_token.level
+                            // );
 
                             // 创建结构树节点
                             let mut cobj = StructToken {
